@@ -161,6 +161,29 @@
   }
 
   /* ---- Workbench design system (Dashboard) ---- */
+  [data-wb-theme="dark"] {
+    --wb-canvas: #0E1116;
+    --wb-surface: #171B22;
+    --wb-surface-raised: #1F2430;
+    --wb-line: #262B35;
+    --wb-ember: #FF7A45;
+    --wb-circuit: #5EEAD4;
+    --wb-text: #ECEEF1;
+    --wb-text-muted: #8A93A6;
+  }
+
+  [data-wb-theme="light"] {
+    --wb-canvas: #F7F5F0;
+    --wb-surface: #FFFFFF;
+    --wb-surface-raised: #EFEDE5;
+    --wb-line: #E1DED3;
+    --wb-ember: #E8631F;
+    --wb-circuit: #0F8C7A;
+    --wb-text: #1A1D23;
+    --wb-text-muted: #6B7280;
+  }
+
+  /* Fallback so components render sensibly before the attribute mounts */
   :root {
     --wb-canvas: #0E1116;
     --wb-surface: #171B22;
