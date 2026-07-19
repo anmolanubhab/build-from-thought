@@ -13,6 +13,8 @@ import { ConnectGitHubButton } from "@/components/dashboard/GitHubButton";
 import { useWorkbenchTheme } from "@/hooks/use-workbench-theme";
 import { getSupabaseConnectionStatus, disconnectSupabase, type SupabaseConnectionStatus } from "@/services/userSupabase";
 import ConnectSupabaseDialog from "@/components/dashboard/ConnectSupabaseDialog";
+import { getVercelConnectionStatus, disconnectVercel, type VercelConnectionStatus } from "@/services/vercelDeploy";
+import ConnectVercelDialog from "@/components/dashboard/ConnectVercelDialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
@@ -87,6 +89,26 @@ export default function Resources() {
   const { theme, toggleTheme } = useWorkbenchTheme();
   const [sbStatus, setSbStatus] = useState<SupabaseConnectionStatus | null>(null);
   const [sbDialogOpen, setSbDialogOpen] = useState(false);
+  const [vcStatus, setVcStatus] = useState<VercelConnectionStatus | null>(null);
+  const [vcDialogOpen, setVcDialogOpen] = useState(false);
+
+  const refreshVercelStatus = () => {
+    getVercelConnectionStatus().then(setVcStatus).catch((err) => console.error("Failed to load Vercel connection status:", err));
+  };
+
+  const handleDisconnectVercel = async () => {
+    try {
+      await disconnectVercel();
+      refreshVercelStatus();
+      toast({ title: "Vercel disconnected" });
+    } catch (err) {
+      toast({
+        title: "Couldn't disconnect",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const refreshSupabaseStatus = () => {
     getSupabaseConnectionStatus().then(setSbStatus).catch((err) => console.error("Failed to load Supabase connection status:", err));
@@ -116,6 +138,7 @@ export default function Resources() {
   useEffect(() => {
     refreshGitHub();
     refreshSupabaseStatus();
+    refreshVercelStatus();
   }, []);
 
   const switchTab = (next: Tab) => {
@@ -233,6 +256,35 @@ export default function Resources() {
                   </div>
                 </div>
 
+                {/* Vercel - user-managed connector (Personal Access Token for now) */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-lg bg-black flex items-center justify-center flex-shrink-0">
+                      <svg viewBox="0 0 76 65" className="h-4 w-4" fill="white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-[var(--wb-text)]">Vercel</h3>
+                        {vcStatus?.connected && (
+                          <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="h-2.5 w-2.5" /> {vcStatus.vercel_username || "Connected"}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">
+                        One-click deploy your generated projects. Connected via token for now — 1-click OAuth is coming soon.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {vcStatus?.connected ? (
+                      <Button variant="outline" size="sm" onClick={handleDisconnectVercel}>Disconnect</Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setVcDialogOpen(true)}>Connect</Button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Your own Supabase - user-managed connector (Personal Access Token for now) */}
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
                   <div className="flex items-center gap-3 min-w-0">
@@ -304,6 +356,11 @@ export default function Resources() {
         open={sbDialogOpen}
         onClose={() => setSbDialogOpen(false)}
         onConnected={() => refreshSupabaseStatus()}
+      />
+      <ConnectVercelDialog
+        open={vcDialogOpen}
+        onClose={() => setVcDialogOpen(false)}
+        onConnected={() => refreshVercelStatus()}
       />
     </div>
   );
