@@ -1,3 +1,4 @@
+// path: src/services/ai.ts
 import { supabase } from "@/integrations/supabase/client";
 
 export interface GeneratedApp {
@@ -8,6 +9,7 @@ export interface GeneratedApp {
   react_code: string;
   pages?: { name: string; title: string; html: string }[];
   is_multipage?: boolean;
+  credits_remaining?: number;
 }
 
 export async function generateApp(prompt: string, isMultipage: boolean = true): Promise<GeneratedApp> {
