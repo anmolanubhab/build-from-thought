@@ -10,6 +10,7 @@ import { Project, generateSlug } from "@/lib/projects";
 import { generateApp } from "@/services/ai";
 import { fetchUserProjects, insertProject, deleteProject as dbDeleteProject, fetchProfileCredits } from "@/services/db";
 import Sidebar, { ProjectFilter } from "@/components/dashboard/Sidebar";
+import { useWorkbenchTheme } from "@/hooks/use-workbench-theme";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ProjectsSection from "@/components/dashboard/ProjectsSection";
 import ProjectModal from "@/components/dashboard/ProjectModal";
@@ -30,6 +31,7 @@ const Dashboard = () => {
   const [ghUsername, setGhUsername] = useState<string>();
   const [isMultipage, setIsMultipage] = useState(true);
   const [sidebarFilter, setSidebarFilter] = useState<ProjectFilter>("all");
+  const { theme, toggleTheme } = useWorkbenchTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [creditsRemaining, setCreditsRemaining] = useState<number>();
   const [creditsLimit, setCreditsLimit] = useState<number>();
@@ -149,7 +151,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex wb-sans" style={{ background: "var(--wb-canvas)" }}>
+    <div className="min-h-screen flex wb-sans" data-wb-theme={theme} style={{ background: "var(--wb-canvas)" }}>
       <Sidebar
         projects={projects}
         open={sidebarOpen}
@@ -160,6 +162,8 @@ const Dashboard = () => {
         onSearchChange={setSearchQuery}
         creditsRemaining={creditsRemaining}
         creditsLimit={creditsLimit}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
