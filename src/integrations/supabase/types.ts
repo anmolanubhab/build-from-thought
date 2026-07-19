@@ -194,22 +194,46 @@ export type Database = {
         Row: {
           code: string | null
           created_at: string
+          css: string | null
+          html: string | null
           id: string
+          pages: Json | null
+          preview_url: string | null
           project_id: string
+          published_at: string | null
+          react_code: string | null
+          status: string
+          summary: string | null
           version_number: number
         }
         Insert: {
           code?: string | null
           created_at?: string
+          css?: string | null
+          html?: string | null
           id?: string
+          pages?: Json | null
+          preview_url?: string | null
           project_id: string
+          published_at?: string | null
+          react_code?: string | null
+          status?: string
+          summary?: string | null
           version_number?: number
         }
         Update: {
           code?: string | null
           created_at?: string
+          css?: string | null
+          html?: string | null
           id?: string
+          pages?: Json | null
+          preview_url?: string | null
           project_id?: string
+          published_at?: string | null
+          react_code?: string | null
+          status?: string
+          summary?: string | null
           version_number?: number
         }
         Relationships: [
@@ -384,6 +408,10 @@ export type Database = {
       get_vercel_connection_status: {
         Args: Record<PropertyKey, never>
         Returns: { connected: boolean; team_name: string | null; vercel_username: string | null }[]
+      }
+      publish_project_version: {
+        Args: { p_version_id: string }
+        Returns: undefined
       }
     }
     Enums: {
