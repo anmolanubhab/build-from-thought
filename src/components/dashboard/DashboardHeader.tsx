@@ -1,5 +1,5 @@
 // path: src/components/dashboard/DashboardHeader.tsx
-import { Send, FileText, Files } from "lucide-react";
+import { Send, FileText, Files, Zap } from "lucide-react";
 
 interface DashboardHeaderProps {
   userName: string;
@@ -28,47 +28,50 @@ export default function DashboardHeader({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-none">
-      {/* Gradient Background */}
-      <div
-        className="px-6 pt-12 pb-16 md:pt-16 md:pb-20 text-center"
-        style={{
-          background: "linear-gradient(135deg, #f472b6 0%, #fb923c 30%, #e879f9 60%, #a78bfa 100%)",
-        }}
-      >
-        <h1 className="text-2xl md:text-3xl font-display font-bold text-gray-900 mb-6">
+    <div className="relative overflow-hidden wb-blueprint-grid" style={{ background: "var(--wb-canvas)" }}>
+      <div className="px-6 pt-14 pb-16 md:pt-20 md:pb-24 text-center relative">
+        <p className="wb-mono text-[11px] tracking-[0.2em] uppercase mb-3" style={{ color: "var(--wb-circuit)" }}>
+          Workbench // Ready to build
+        </p>
+        <h1 className="wb-display text-2xl md:text-4xl font-semibold mb-8" style={{ color: "var(--wb-text)" }}>
           Got an idea, {userName}?
         </h1>
 
         {/* SPA / Multi-page toggle */}
-        <div className="flex items-center justify-center gap-2 mb-4">
+        <div className="flex items-center justify-center gap-1.5 mb-5">
           <button
             onClick={() => onToggleMultipage(false)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              !isMultipage
-                ? "bg-white/90 text-gray-900 shadow-sm"
-                : "bg-white/30 text-white hover:bg-white/40"
-            }`}
+            className="wb-mono flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] uppercase tracking-wide transition-colors border"
+            style={{
+              background: !isMultipage ? "var(--wb-surface-raised)" : "transparent",
+              borderColor: !isMultipage ? "var(--wb-circuit)" : "var(--wb-line)",
+              color: !isMultipage ? "var(--wb-circuit)" : "var(--wb-text-muted)",
+            }}
           >
             <FileText className="h-3.5 w-3.5" />
             Single Page
           </button>
           <button
             onClick={() => onToggleMultipage(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              isMultipage
-                ? "bg-white/90 text-gray-900 shadow-sm"
-                : "bg-white/30 text-white hover:bg-white/40"
-            }`}
+            className="wb-mono flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] uppercase tracking-wide transition-colors border"
+            style={{
+              background: isMultipage ? "var(--wb-surface-raised)" : "transparent",
+              borderColor: isMultipage ? "var(--wb-circuit)" : "var(--wb-line)",
+              color: isMultipage ? "var(--wb-circuit)" : "var(--wb-text-muted)",
+            }}
           >
             <Files className="h-3.5 w-3.5" />
             Multi Page
           </button>
         </div>
 
-        {/* Prompt Input */}
+        {/* Ignition console */}
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg flex items-center gap-2 px-4 py-3">
+          <div
+            className="wb-console-glow rounded-2xl flex items-center gap-3 px-5 py-4 border transition-shadow"
+            style={{ background: "var(--wb-surface)", borderColor: "var(--wb-line)" }}
+          >
+            <span className="wb-mono text-sm flex-shrink-0" style={{ color: "var(--wb-circuit)" }}>{">"}</span>
             <input
               type="text"
               value={prompt}
@@ -79,34 +82,36 @@ export default function DashboardHeader({
                   ? "Describe your website... e.g. 'A portfolio site with about and contact pages'"
                   : "Ask WebdevsAI to create a landing page for my..."
               }
-              className="flex-1 text-sm text-gray-700 placeholder:text-gray-400 outline-none bg-transparent"
+              className="wb-sans flex-1 text-sm outline-none bg-transparent placeholder:opacity-60"
+              style={{ color: "var(--wb-text)" }}
               disabled={generating}
             />
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button
-                onClick={onGenerate}
-                disabled={generating || !prompt.trim()}
-                className="p-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {generating ? (
-                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin block" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </button>
-            </div>
+            {!generating && <span className="wb-cursor wb-mono text-sm flex-shrink-0" style={{ color: "var(--wb-text-muted)" }}>_</span>}
+            <button
+              onClick={onGenerate}
+              disabled={generating || !prompt.trim()}
+              className="p-2.5 rounded-xl text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+              style={{ background: "var(--wb-ember)" }}
+              title="Generate"
+            >
+              {generating ? (
+                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin block" />
+              ) : (
+                <Zap className="h-4 w-4" fill="white" />
+              )}
+            </button>
           </div>
 
           {isMultipage && (
-            <p className="mt-2 text-xs text-white/80">
+            <p className="wb-mono mt-3 text-[11px]" style={{ color: "var(--wb-text-muted)" }}>
               Multi-page mode: generates separate HTML files (Home, About, Contact, etc.) with shared navigation
             </p>
           )}
         </div>
 
         {generating && (
-          <p className="mt-4 text-sm text-white/90 animate-pulse font-medium">
-            ✨ Generating your {isMultipage ? "multi-page website" : "app"}... This may take 10-20 seconds.
+          <p className="wb-mono mt-4 text-xs animate-pulse" style={{ color: "var(--wb-ember)" }}>
+            ⚡ Generating your {isMultipage ? "multi-page website" : "app"}... This may take 10-20 seconds.
           </p>
         )}
       </div>
