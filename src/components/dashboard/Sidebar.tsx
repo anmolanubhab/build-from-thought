@@ -76,7 +76,7 @@ export default function Sidebar({
     },
     {
       icon: BookOpen, label: "Resources", id: "resources", shortcut: "",
-      onClick: () => toast({ title: "Resources", description: "Docs and guides are coming soon." }),
+      onClick: () => navigate("/dashboard/resources"),
       active: false,
     },
   ];
