@@ -55,12 +55,14 @@ export type Database = {
       }
       deployments: {
         Row: {
+          ai_suggestions: Json | null
           created_at: string
           deploy_url: string | null
           env_var_keys: string[] | null
           error_message: string | null
           external_id: string | null
           id: string
+          lighthouse_scores: Json | null
           production_alias: string | null
           project_id: string
           provider: string
@@ -68,12 +70,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_suggestions?: Json | null
           created_at?: string
           deploy_url?: string | null
           env_var_keys?: string[] | null
           error_message?: string | null
           external_id?: string | null
           id?: string
+          lighthouse_scores?: Json | null
           production_alias?: string | null
           project_id: string
           provider?: string
@@ -81,12 +85,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_suggestions?: Json | null
           created_at?: string
           deploy_url?: string | null
           env_var_keys?: string[] | null
           error_message?: string | null
           external_id?: string | null
           id?: string
+          lighthouse_scores?: Json | null
           production_alias?: string | null
           project_id?: string
           provider?: string
