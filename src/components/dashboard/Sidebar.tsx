@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import SettingsModal from "./SettingsModal";
 
 export type ProjectFilter = "all" | "starred" | "mine" | "shared";
 
@@ -38,7 +39,24 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [wsOpen, setWsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const recentProjects = projects.slice(0, 3);
+
+  const copyInviteLink = async () => {
+    const link = `${window.location.origin}/signup`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Invite link copied", description: link });
+    } catch {
+      toast({ title: "Couldn't copy link", description: link, variant: "destructive" });
+    }
+    setWsOpen(false);
+  };
+
+  const createWorkspace = () => {
+    toast({ title: "Multiple workspaces", description: "This feature is coming soon." });
+    setWsOpen(false);
+  };
 
   const goHome = () => {
     onFilterChange("all");
@@ -100,10 +118,16 @@ export default function Sidebar({
 
               {/* Action Buttons */}
               <div className="px-3 pb-2 flex gap-2">
-                <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <button
+                  onClick={() => { setWsOpen(false); setSettingsOpen(true); }}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
                   <Settings className="h-3.5 w-3.5" /> Settings
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <button
+                  onClick={copyInviteLink}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
                   <UserPlus className="h-3.5 w-3.5" /> Invite
                 </button>
               </div>
@@ -144,7 +168,10 @@ export default function Sidebar({
 
               {/* Create new */}
               <div className="px-3 pb-3 pt-1">
-                <button className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors border border-dashed border-gray-200">
+                <button
+                  onClick={createWorkspace}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors border border-dashed border-gray-200"
+                >
                   <Plus className="h-3.5 w-3.5" /> Create new workspace
                 </button>
               </div>
@@ -271,6 +298,7 @@ export default function Sidebar({
           </div>
         </div>
       </aside>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );
 }
