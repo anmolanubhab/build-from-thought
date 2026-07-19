@@ -15,6 +15,8 @@ import { getSupabaseConnectionStatus, disconnectSupabase, type SupabaseConnectio
 import ConnectSupabaseDialog from "@/components/dashboard/ConnectSupabaseDialog";
 import { getVercelConnectionStatus, disconnectVercel, type VercelConnectionStatus } from "@/services/vercelDeploy";
 import ConnectVercelDialog from "@/components/dashboard/ConnectVercelDialog";
+import { getNetlifyConnectionStatus, disconnectNetlify, type NetlifyConnectionStatus } from "@/services/netlifyDeploy";
+import ConnectNetlifyDialog from "@/components/dashboard/ConnectNetlifyDialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
@@ -91,6 +93,26 @@ export default function Resources() {
   const [sbDialogOpen, setSbDialogOpen] = useState(false);
   const [vcStatus, setVcStatus] = useState<VercelConnectionStatus | null>(null);
   const [vcDialogOpen, setVcDialogOpen] = useState(false);
+  const [nlStatus, setNlStatus] = useState<NetlifyConnectionStatus | null>(null);
+  const [nlDialogOpen, setNlDialogOpen] = useState(false);
+
+  const refreshNetlifyStatus = () => {
+    getNetlifyConnectionStatus().then(setNlStatus).catch((err) => console.error("Failed to load Netlify connection status:", err));
+  };
+
+  const handleDisconnectNetlify = async () => {
+    try {
+      await disconnectNetlify();
+      refreshNetlifyStatus();
+      toast({ title: "Netlify disconnected" });
+    } catch (err) {
+      toast({
+        title: "Couldn't disconnect",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const refreshVercelStatus = () => {
     getVercelConnectionStatus().then(setVcStatus).catch((err) => console.error("Failed to load Vercel connection status:", err));
@@ -139,6 +161,7 @@ export default function Resources() {
     refreshGitHub();
     refreshSupabaseStatus();
     refreshVercelStatus();
+    refreshNetlifyStatus();
   }, []);
 
   const switchTab = (next: Tab) => {
@@ -285,6 +308,35 @@ export default function Resources() {
                   </div>
                 </div>
 
+                {/* Netlify - user-managed connector (Personal Access Token) */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-lg bg-teal-600 flex items-center justify-center flex-shrink-0">
+                      <svg viewBox="0 0 40 40" className="h-4 w-4" fill="white"><path d="M11.5 28.5l5-5-5-5v10zM11.5 16.5l5-5-5-5v10zM23.5 28.5l5-5-5-5v10z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-[var(--wb-text)]">Netlify</h3>
+                        {nlStatus?.connected && (
+                          <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="h-2.5 w-2.5" /> {nlStatus.netlify_email || "Connected"}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">
+                        Alternative one-click deploy target alongside Vercel.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {nlStatus?.connected ? (
+                      <Button variant="outline" size="sm" onClick={handleDisconnectNetlify}>Disconnect</Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setNlDialogOpen(true)}>Connect</Button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Your own Supabase - user-managed connector (Personal Access Token for now) */}
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
                   <div className="flex items-center gap-3 min-w-0">
@@ -361,6 +413,11 @@ export default function Resources() {
         open={vcDialogOpen}
         onClose={() => setVcDialogOpen(false)}
         onConnected={() => refreshVercelStatus()}
+      />
+      <ConnectNetlifyDialog
+        open={nlDialogOpen}
+        onClose={() => setNlDialogOpen(false)}
+        onConnected={() => refreshNetlifyStatus()}
       />
     </div>
   );
