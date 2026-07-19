@@ -264,6 +264,33 @@ export type Database = {
         }
         Relationships: []
       }
+      supabase_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          project_name: string | null
+          project_ref: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          project_name?: string | null
+          project_ref?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          project_name?: string | null
+          project_ref?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shared_projects: {
         Row: {
           created_at: string
@@ -301,6 +328,10 @@ export type Database = {
       record_referral: {
         Args: { p_referrer_id: string }
         Returns: undefined
+      }
+      get_supabase_connection_status: {
+        Args: Record<PropertyKey, never>
+        Returns: { connected: boolean; project_ref: string | null; project_name: string | null }[]
       }
     }
     Enums: {
