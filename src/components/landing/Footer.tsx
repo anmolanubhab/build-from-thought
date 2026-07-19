@@ -1,7 +1,14 @@
+// path: src/components/landing/Footer.tsx
 const columns = [
-  { title: "Product", links: ["Features", "Templates", "Docs"] },
-  { title: "Company", links: ["About", "Contact"] },
-  { title: "Legal", links: ["Privacy", "Terms"] },
+  {
+    title: "Product",
+    links: [
+      { label: "Features", href: "#features" },
+      { label: "Templates", href: "#templates" },
+      { label: "Docs", href: "#docs" },
+      { label: "Pricing", href: "#pricing" },
+    ],
+  },
 ];
 
 const Footer = () => (
@@ -19,9 +26,9 @@ const Footer = () => (
             <h4 className="font-display font-semibold text-foreground text-sm mb-4">{title}</h4>
             <ul className="space-y-2">
               {links.map((link) => (
-                <li key={link}>
-                  <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {link}
+                <li key={link.label}>
+                  <a href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    {link.label}
                   </a>
                 </li>
               ))}
