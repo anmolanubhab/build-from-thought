@@ -1,3 +1,4 @@
+// path: src/components/dashboard/ProjectModal.tsx
 import { useState } from "react";
 import { Project, getProjectPages } from "@/lib/projects";
 import { downloadProject } from "@/services/export";
@@ -11,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Eye, Code, Download, Rocket, Copy, ExternalLink, Share2, CheckCircle, XCircle, Files } from "lucide-react";
 import { PushToGitHubButton } from "@/components/dashboard/GitHubButton";
+import DeployToVercelDialog from "@/components/dashboard/DeployToVercelDialog";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +34,7 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
   const [codeTab, setCodeTab] = useState<"html" | "react">("html");
   const [downloading, setDownloading] = useState(false);
   const [deployStatus, setDeployStatus] = useState<DeployStatus>("idle");
+  const [vercelDialogOpen, setVercelDialogOpen] = useState(false);
   const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
   const [activePage, setActivePage] = useState(0);
 
@@ -93,6 +96,7 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
 </style></head><body>${currentPage?.html || "<div style='padding:2rem;color:#94a3b8;'>No preview available</div>"}</body></html>`;
 
   return (
+    <>
     <Dialog open={!!project} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl glass border-border/50 bg-card/95 max-h-[90vh] overflow-auto">
         <DialogHeader>
@@ -134,8 +138,12 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
                 ) : deployStatus === "error" ? (
                   <><XCircle className="h-3 w-3" /> Retry</>
                 ) : (
-                  <><Rocket className="h-3 w-3" /> Deploy</>
+                  <><Rocket className="h-3 w-3" /> Quick Deploy</>
                 )}
+              </Button>
+
+              <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50 hover:border-primary" onClick={() => setVercelDialogOpen(true)}>
+                <Rocket className="h-3 w-3" /> Deploy to Vercel
               </Button>
             </div>
           </div>
@@ -207,5 +215,7 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
         </Tabs>
       </DialogContent>
     </Dialog>
+    <DeployToVercelDialog open={vercelDialogOpen} onClose={() => setVercelDialogOpen(false)} project={project} />
+    </>
   );
 }
