@@ -149,7 +149,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen flex wb-sans" style={{ background: "var(--wb-canvas)" }}>
       <Sidebar
         projects={projects}
         open={sidebarOpen}
@@ -163,18 +163,24 @@ const Dashboard = () => {
       />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <header className="lg:hidden h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4">
-          <button onClick={() => setSidebarOpen(true)} className="text-gray-600">
+        <header
+          className="lg:hidden h-12 border-b flex items-center justify-between px-4"
+          style={{ background: "var(--wb-canvas)", borderColor: "var(--wb-line)" }}
+        >
+          <button onClick={() => setSidebarOpen(true)} style={{ color: "var(--wb-text-muted)" }}>
             <Menu className="h-5 w-5" />
           </button>
           <ConnectGitHubButton connected={ghConnected} username={ghUsername} onStatusChange={refreshGitHub} />
         </header>
 
-        <div className="hidden lg:flex items-center justify-end px-6 py-2 border-b border-gray-100 bg-white">
+        <div
+          className="hidden lg:flex items-center justify-end px-6 py-2 border-b"
+          style={{ background: "var(--wb-canvas)", borderColor: "var(--wb-line)" }}
+        >
           <ConnectGitHubButton connected={ghConnected} username={ghUsername} onStatusChange={refreshGitHub} />
         </div>
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto" style={{ background: "var(--wb-canvas)" }}>
           <DashboardHeader
             userName={user?.name?.split(" ")[0] || "there"}
             prompt={prompt}
@@ -186,7 +192,7 @@ const Dashboard = () => {
           />
 
           {sidebarFilter === "shared" && !loadingProjects && (
-            <p className="px-6 md:px-8 -mt-2 mb-2 text-[13px] text-gray-500">
+            <p className="px-6 md:px-8 -mt-2 mb-2 text-[13px]" style={{ color: "var(--wb-text-muted)" }}>
               Team sharing isn't set up yet — projects others share with you will show up here.
             </p>
           )}
@@ -212,15 +218,15 @@ const Dashboard = () => {
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent className="bg-white border-gray-200">
+        <AlertDialogContent className="bg-[var(--wb-surface)] border-[var(--wb-line)] wb-sans">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-gray-900">Delete Project</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-500">
+            <AlertDialogTitle className="text-[var(--wb-text)]">Delete Project</AlertDialogTitle>
+            <AlertDialogDescription className="text-[var(--wb-text-muted)]">
               This action cannot be undone. This will permanently delete your project.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="bg-[var(--wb-surface-raised)] text-[var(--wb-text)] border-[var(--wb-line)] hover:bg-[var(--wb-surface-raised)] hover:brightness-125">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-500 text-white hover:bg-red-600">
               Delete
             </AlertDialogAction>
