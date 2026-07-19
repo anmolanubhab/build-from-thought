@@ -353,6 +353,59 @@ export type Database = {
         }
         Relationships: []
       }
+      netlify_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          netlify_email: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          netlify_email?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          netlify_email?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      project_netlify_sites: {
+        Row: {
+          created_at: string
+          project_id: string
+          site_id: string
+          site_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          project_id: string
+          site_id: string
+          site_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          project_id?: string
+          site_id?: string
+          site_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_netlify_sites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vercel_connections: {
         Row: {
           access_token: string
@@ -459,6 +512,10 @@ export type Database = {
       publish_project_version: {
         Args: { p_version_id: string }
         Returns: undefined
+      }
+      get_netlify_connection_status: {
+        Args: Record<PropertyKey, never>
+        Returns: { connected: boolean; netlify_email: string | null }[]
       }
     }
     Enums: {
