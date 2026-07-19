@@ -108,7 +108,7 @@ export default function Resources() {
   const noop = () => {};
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-[var(--wb-canvas)] flex wb-sans">
       <Sidebar
         projects={[]}
         open={sidebarOpen}
@@ -120,27 +120,27 @@ export default function Resources() {
       />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <header className="lg:hidden h-12 bg-white border-b border-gray-200 flex items-center px-4">
-          <button onClick={() => setSidebarOpen(true)} className="text-gray-600">
+        <header className="lg:hidden h-12 bg-[var(--wb-surface)] border-b border-[var(--wb-line)] flex items-center px-4">
+          <button onClick={() => setSidebarOpen(true)} className="text-[var(--wb-text-muted)]">
             <Menu className="h-5 w-5" />
           </button>
         </header>
 
         <main className="flex-1 overflow-auto p-6 md:p-10">
           <div className="max-w-5xl mx-auto">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Resources</h1>
-            <p className="text-gray-500 mb-6">
+            <h1 className="text-2xl font-bold text-[var(--wb-text)] mb-1">Resources</h1>
+            <p className="text-[var(--wb-text-muted)] mb-6">
               {tab === "templates"
                 ? "Start from a template and let AI fill in the details."
                 : "Manage the services connected to your workspace."}
             </p>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 mb-8 border-b border-gray-200">
+            <div className="flex items-center gap-1 mb-8 border-b border-[var(--wb-line)]">
               <button
                 onClick={() => switchTab("templates")}
                 className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  tab === "templates" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"
+                  tab === "templates" ? "border-[var(--wb-ember)] text-[var(--wb-text)]" : "border-transparent text-[var(--wb-text-muted)] hover:text-[var(--wb-text)]"
                 }`}
               >
                 Templates
@@ -148,7 +148,7 @@ export default function Resources() {
               <button
                 onClick={() => switchTab("connectors")}
                 className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  tab === "connectors" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"
+                  tab === "connectors" ? "border-[var(--wb-ember)] text-[var(--wb-text)]" : "border-transparent text-[var(--wb-text-muted)] hover:text-[var(--wb-text)]"
                 }`}
               >
                 Connectors
@@ -161,7 +161,7 @@ export default function Resources() {
                   <button
                     key={t.id}
                     onClick={() => useTemplate(t)}
-                    className="text-left rounded-2xl overflow-hidden border border-gray-100 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group"
+                    className="text-left rounded-2xl overflow-hidden border border-[var(--wb-line)] bg-[var(--wb-surface)] hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group"
                   >
                     <div
                       className="h-28 flex items-center justify-center"
@@ -170,8 +170,8 @@ export default function Resources() {
                       <t.icon className="h-9 w-9" style={{ color: t.color }} />
                     </div>
                     <div className="p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1">{t.title}</h3>
-                      <p className="text-xs text-gray-500 mb-3">{t.description}</p>
+                      <h3 className="text-sm font-semibold text-[var(--wb-text)] mb-1">{t.title}</h3>
+                      <p className="text-xs text-[var(--wb-text-muted)] mb-3">{t.description}</p>
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 group-hover:gap-1.5 transition-all">
                         Use this template <ArrowRight className="h-3 w-3" />
                       </span>
@@ -182,21 +182,21 @@ export default function Resources() {
             ) : (
               <div className="space-y-4 max-w-2xl">
                 {/* GitHub - user-managed connector */}
-                <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5">
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-lg bg-gray-900 flex items-center justify-center flex-shrink-0">
+                    <div className="h-10 w-10 rounded-lg bg-[var(--wb-surface-raised)] flex items-center justify-center flex-shrink-0">
                       <Github className="h-5 w-5 text-white" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-gray-900">GitHub</h3>
+                        <h3 className="text-sm font-semibold text-[var(--wb-text)]">GitHub</h3>
                         {ghConnected && (
-                          <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                             <CheckCircle2 className="h-2.5 w-2.5" /> Connected{ghUsername ? ` as ${ghUsername}` : ""}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">Push generated projects straight to a new repo.</p>
+                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">Push generated projects straight to a new repo.</p>
                     </div>
                   </div>
                   <div className="flex-shrink-0">
@@ -205,37 +205,37 @@ export default function Resources() {
                 </div>
 
                 {/* Supabase - platform-level, always on */}
-                <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5">
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-10 w-10 rounded-lg bg-emerald-600 flex items-center justify-center flex-shrink-0">
                       <Database className="h-5 w-5 text-white" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-gray-900">Supabase</h3>
-                        <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <h3 className="text-sm font-semibold text-[var(--wb-text)]">Supabase</h3>
+                        <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                           <CheckCircle2 className="h-2.5 w-2.5" /> Active
                         </Badge>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">Powers your database, auth, and storage. Built in — nothing to connect.</p>
+                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">Powers your database, auth, and storage. Built in — nothing to connect.</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Gemini AI - platform-level, always on */}
-                <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5">
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-10 w-10 rounded-lg bg-violet-600 flex items-center justify-center flex-shrink-0">
                       <Sparkles className="h-5 w-5 text-white" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-gray-900">Google Gemini</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">Powers AI app generation. Configured on the backend for your workspace.</p>
+                      <h3 className="text-sm font-semibold text-[var(--wb-text)]">Google Gemini</h3>
+                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">Powers AI app generation. Configured on the backend for your workspace.</p>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-xs text-gray-400 pt-2">More connectors (Slack, Notion, and others) are on the roadmap.</p>
+                <p className="text-xs text-[var(--wb-text-muted)] pt-2">More connectors (Slack, Notion, and others) are on the roadmap.</p>
               </div>
             )}
           </div>
