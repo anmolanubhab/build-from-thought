@@ -190,6 +190,47 @@ export type Database = {
         }
         Relationships: []
       }
+      project_domains: {
+        Row: {
+          created_at: string
+          domain: string
+          error_message: string | null
+          id: string
+          project_id: string
+          status: string
+          updated_at: string
+          verification: Json | null
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          error_message?: string | null
+          id?: string
+          project_id: string
+          status?: string
+          updated_at?: string
+          verification?: Json | null
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          error_message?: string | null
+          id?: string
+          project_id?: string
+          status?: string
+          updated_at?: string
+          verification?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_domains_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_versions: {
         Row: {
           code: string | null
