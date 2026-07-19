@@ -14,7 +14,9 @@ import {
   rollbackToDeployment, explainBuildError,
   type DeploymentRecord, type BuildErrorExplanation,
 } from "@/services/vercelDeploy";
-import { CheckCircle2, XCircle, Loader2, ExternalLink, Sparkles, RotateCcw, RefreshCw } from "lucide-react";
+import { analyzeDeployment, applyAiFixes, type LighthouseScores, type AiSuggestion } from "@/services/aiReview";
+import { createDraft } from "@/services/versions";
+import { CheckCircle2, XCircle, Loader2, ExternalLink, Sparkles, RotateCcw, RefreshCw, Gauge } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -37,6 +39,10 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
   const [explaining, setExplaining] = useState(false);
   const [explanation, setExplanation] = useState<BuildErrorExplanation | null>(null);
   const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [scores, setScores] = useState<LighthouseScores | null>(null);
+  const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
+  const [applyingFixes, setApplyingFixes] = useState(false);
 
   const refreshHistory = () => {
     if (project) fetchDeploymentHistory(project.id).then(setHistory).catch(() => {});
@@ -52,6 +58,8 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
       setErrorMessage(null);
       setLogs([]);
       setExplanation(null);
+      setScores(null);
+      setSuggestions([]);
       refreshHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,6 +152,50 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
     setPhase("form");
   };
 
+  const handleAnalyze = async () => {
+    if (!deploymentId) return;
+    setAnalyzing(true);
+    try {
+      const result = await analyzeDeployment(deploymentId);
+      setScores(result.scores);
+      setSuggestions(result.suggestions);
+    } catch (err) {
+      toast({
+        title: "Couldn't analyze deployment",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleApplyAll = async () => {
+    if (!project || suggestions.length === 0) return;
+    setApplyingFixes(true);
+    try {
+      const result = await applyAiFixes(
+        project.id,
+        { html: project.html || "", css: project.css || "", react_code: project.react_code || "" },
+        suggestions
+      );
+      await createDraft(
+        project.id,
+        { html: result.html, css: result.css, react_code: result.react_code, pages: project.pages },
+        result.summary
+      );
+      toast({ title: "Draft created", description: "Open the project in the Editor to preview and publish these fixes." });
+    } catch (err) {
+      toast({
+        title: "Couldn't apply fixes",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setApplyingFixes(false);
+    }
+  };
+
   const handleClose = () => onClose();
 
   if (!project) return null;
@@ -206,13 +258,61 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
         )}
 
         {tab === "deploy" && phase === "success" && (
-          <div className="py-8 text-center space-y-3">
-            <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-            <p className="font-semibold">Deployed successfully!</p>
-            {deployUrl && (
-              <a href={deployUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-violet-600 hover:underline">
-                {deployUrl} <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+          <div className="py-4 space-y-4 max-h-96 overflow-auto">
+            <div className="text-center space-y-3">
+              <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
+              <p className="font-semibold">Deployed successfully!</p>
+              {deployUrl && (
+                <a href={deployUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-violet-600 hover:underline">
+                  {deployUrl} <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+
+            {!scores && (
+              <div className="text-center">
+                <Button size="sm" variant="outline" onClick={handleAnalyze} disabled={analyzing} className="gap-1.5">
+                  <Gauge className="h-3.5 w-3.5" /> {analyzing ? "Analyzing (Lighthouse)..." : "Run AI Deployment Review"}
+                </Button>
+              </div>
+            )}
+
+            {scores && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  {([
+                    ["Performance", scores.performance],
+                    ["SEO", scores.seo],
+                    ["Accessibility", scores.accessibility],
+                    ["Best Practices", scores.best_practices],
+                  ] as const).map(([label, value]) => (
+                    <div key={label} className="rounded-lg border p-2">
+                      <p className={`text-lg font-bold ${value >= 90 ? "text-emerald-500" : value >= 50 ? "text-amber-500" : "text-red-500"}`}>{value}</p>
+                      <p className="text-[10px] text-muted-foreground">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {suggestions.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Suggestions</p>
+                    {suggestions.map((s, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs rounded-md bg-muted/50 p-2">
+                        <Sparkles className="h-3 w-3 mt-0.5 text-violet-500 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">{s.title}</p>
+                          <p className="text-muted-foreground">{s.detail}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <Button size="sm" onClick={handleApplyAll} disabled={applyingFixes} className="w-full gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5" /> {applyingFixes ? "Applying fixes..." : "Apply All (creates a draft)"}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center">No major issues found — nice work!</p>
+                )}
+              </div>
             )}
           </div>
         )}
