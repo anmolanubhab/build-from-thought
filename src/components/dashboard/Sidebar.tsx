@@ -47,10 +47,10 @@ export default function Sidebar({
   const recentProjects = projects.slice(0, 3);
 
   const copyInviteLink = async () => {
-    const link = `${window.location.origin}/signup`;
+    const link = `${window.location.origin}/signup?ref=${user?.id ?? ""}`;
     try {
       await navigator.clipboard.writeText(link);
-      toast({ title: "Invite link copied", description: link });
+      toast({ title: "Invite link copied", description: "You'll get 5 bonus credits when they sign up." });
     } catch {
       toast({ title: "Couldn't copy link", description: link, variant: "destructive" });
     }
@@ -268,13 +268,16 @@ export default function Sidebar({
 
         {/* Bottom Cards */}
         <div className="p-2 space-y-1.5 border-t border-gray-100">
-          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
+          <div
+            onClick={copyInviteLink}
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+          >
             <div className="h-7 w-7 rounded-md bg-gray-200 flex items-center justify-center">
               <Users className="h-3.5 w-3.5 text-gray-500" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold text-gray-900">Share WebdevsAI</p>
-              <p className="text-[11px] text-gray-400">100 credits per referral</p>
+              <p className="text-[11px] text-gray-400">5 credits per referral</p>
             </div>
           </div>
 
