@@ -1,3 +1,4 @@
+// path: src/lib/projects.ts
 export type ProjectType = "portfolio" | "dashboard" | "landing" | "generic";
 
 export interface PageData {
@@ -18,6 +19,7 @@ export interface Project {
   react_code?: string;
   deployed_url?: string;
   is_public: boolean;
+  is_starred: boolean;
   is_multipage: boolean;
   pages?: PageData[] | null;
   view_count: number;
