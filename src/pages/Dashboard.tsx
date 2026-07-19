@@ -1,3 +1,4 @@
+// path: src/pages/Dashboard.tsx
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -7,7 +8,7 @@ import {
 import { Menu } from "lucide-react";
 import { Project, generateSlug } from "@/lib/projects";
 import { generateApp } from "@/services/ai";
-import { fetchUserProjects, insertProject, deleteProject as dbDeleteProject } from "@/services/db";
+import { fetchUserProjects, insertProject, deleteProject as dbDeleteProject, fetchProfileCredits } from "@/services/db";
 import Sidebar, { ProjectFilter } from "@/components/dashboard/Sidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ProjectsSection from "@/components/dashboard/ProjectsSection";
@@ -30,6 +31,8 @@ const Dashboard = () => {
   const [isMultipage, setIsMultipage] = useState(true);
   const [sidebarFilter, setSidebarFilter] = useState<ProjectFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [creditsRemaining, setCreditsRemaining] = useState<number>();
+  const [creditsLimit, setCreditsLimit] = useState<number>();
 
   // "Created by me" is equivalent to "All projects" today since this app has
   // no team/multi-owner model yet. "Shared with me" has no data source yet
@@ -37,7 +40,7 @@ const Dashboard = () => {
   const visibleProjects = useMemo(() => {
     let list = projects;
     if (sidebarFilter === "starred") {
-      list = list.filter((p) => p.is_public);
+      list = list.filter((p) => p.is_starred);
     } else if (sidebarFilter === "shared") {
       list = [];
     }
@@ -62,6 +65,10 @@ const Dashboard = () => {
       .then(setProjects)
       .catch((err) => console.error("Failed to load projects:", err))
       .finally(() => setLoadingProjects(false));
+
+    fetchProfileCredits(user.id)
+      .then((c) => { setCreditsRemaining(c.credits_remaining); setCreditsLimit(c.credits_daily_limit); })
+      .catch((err) => console.error("Failed to load credits:", err));
 
     refreshGitHub();
 
@@ -99,6 +106,9 @@ const Dashboard = () => {
       });
       setProjects((prev) => [newProject, ...prev]);
       setPrompt("");
+      if (typeof result.credits_remaining === "number") {
+        setCreditsRemaining(result.credits_remaining);
+      }
       toast({ title: "App generated!", description: `"${newProject.title}" is ready.` });
     } catch (err) {
       console.error("Generation failed:", err);
@@ -140,6 +150,8 @@ const Dashboard = () => {
         onFilterChange={setSidebarFilter}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        creditsRemaining={creditsRemaining}
+        creditsLimit={creditsLimit}
       />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
@@ -175,6 +187,9 @@ const Dashboard = () => {
             loading={loadingProjects}
             onOpen={setSelectedProject}
             onDelete={(id) => setDeleteTarget(id)}
+            onStarChange={(updated) =>
+              setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+            }
           />
 
           <div className="h-8" />
