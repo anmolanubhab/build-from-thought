@@ -1,3 +1,4 @@
+/* path: src/index.css */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@500;600;700;800;900&display=swap');
 
 @tailwind base;
@@ -157,6 +158,51 @@
   @keyframes pulse-glow {
     0%, 100% { opacity: 0.15; transform: scale(1); }
     50% { opacity: 0.25; transform: scale(1.05); }
+  }
+
+  /* ---- Workbench design system (Dashboard) ---- */
+  :root {
+    --wb-canvas: #0E1116;
+    --wb-surface: #171B22;
+    --wb-surface-raised: #1F2430;
+    --wb-line: #262B35;
+    --wb-ember: #FF7A45;
+    --wb-circuit: #5EEAD4;
+    --wb-text: #ECEEF1;
+    --wb-text-muted: #8A93A6;
+  }
+
+  .wb-display {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .wb-sans {
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  .wb-mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .wb-blueprint-grid {
+    background-image:
+      linear-gradient(to right, rgba(94, 234, 212, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(94, 234, 212, 0.06) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .wb-console-glow:focus-within {
+    box-shadow: 0 0 0 1px var(--wb-ember), 0 0 24px -4px rgba(255, 122, 69, 0.45);
+  }
+
+  @keyframes wb-cursor-blink {
+    0%, 45% { opacity: 1; }
+    50%, 95% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  .wb-cursor {
+    animation: wb-cursor-blink 1.1s step-end infinite;
   }
 
   .animate-pulse-glow {
