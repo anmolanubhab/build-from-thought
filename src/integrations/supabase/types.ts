@@ -274,7 +274,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      record_referral: {
+        Args: { p_referrer_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
