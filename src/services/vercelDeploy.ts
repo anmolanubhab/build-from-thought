@@ -86,3 +86,25 @@ export async function fetchDeploymentHistory(projectId: string): Promise<Deploym
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as DeploymentRecord[];
 }
+
+export async function rollbackToDeployment(deploymentId: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("vercel-rollback", {
+    body: { deployment_id: deploymentId },
+  });
+  if (error) throw new Error(error.message || "Rollback failed");
+  if (data?.error) throw new Error(data.error);
+}
+
+export interface BuildErrorExplanation {
+  explanation: string;
+  suggested_command: string | null;
+}
+
+export async function explainBuildError(errorMessage: string | null, logs: string[]): Promise<BuildErrorExplanation> {
+  const { data, error } = await supabase.functions.invoke("explain-build-error", {
+    body: { error_message: errorMessage, logs },
+  });
+  if (error) throw new Error(error.message || "Failed to get AI explanation");
+  if (data?.error) throw new Error(data.error);
+  return data as BuildErrorExplanation;
+}
