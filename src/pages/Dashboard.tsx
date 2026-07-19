@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -8,7 +8,7 @@ import { Menu } from "lucide-react";
 import { Project, generateSlug } from "@/lib/projects";
 import { generateApp } from "@/services/ai";
 import { fetchUserProjects, insertProject, deleteProject as dbDeleteProject } from "@/services/db";
-import Sidebar from "@/components/dashboard/Sidebar";
+import Sidebar, { ProjectFilter } from "@/components/dashboard/Sidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ProjectsSection from "@/components/dashboard/ProjectsSection";
 import ProjectModal from "@/components/dashboard/ProjectModal";
@@ -28,6 +28,25 @@ const Dashboard = () => {
   const [ghConnected, setGhConnected] = useState(false);
   const [ghUsername, setGhUsername] = useState<string>();
   const [isMultipage, setIsMultipage] = useState(true);
+  const [sidebarFilter, setSidebarFilter] = useState<ProjectFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // "Created by me" is equivalent to "All projects" today since this app has
+  // no team/multi-owner model yet. "Shared with me" has no data source yet
+  // (no collaboration feature) so it correctly shows an empty state.
+  const visibleProjects = useMemo(() => {
+    let list = projects;
+    if (sidebarFilter === "starred") {
+      list = list.filter((p) => p.is_public);
+    } else if (sidebarFilter === "shared") {
+      list = [];
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) => p.title.toLowerCase().includes(q));
+    }
+    return list;
+  }, [projects, sidebarFilter, searchQuery]);
 
   const refreshGitHub = () => {
     getGitHubStatus().then(({ connected, username }) => {
@@ -113,7 +132,15 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar projects={projects} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        projects={projects}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        activeFilter={sidebarFilter}
+        onFilterChange={setSidebarFilter}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <header className="lg:hidden h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4">
@@ -138,8 +165,13 @@ const Dashboard = () => {
             onToggleMultipage={setIsMultipage}
           />
 
+          {sidebarFilter === "shared" && !loadingProjects && (
+            <p className="px-6 md:px-8 -mt-2 mb-2 text-[13px] text-gray-500">
+              Team sharing isn't set up yet — projects others share with you will show up here.
+            </p>
+          )}
           <ProjectsSection
-            projects={projects}
+            projects={visibleProjects}
             loading={loadingProjects}
             onOpen={setSelectedProject}
             onDelete={(id) => setDeleteTarget(id)}
