@@ -1,3 +1,4 @@
+// path: src/components/dashboard/Sidebar.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +24,8 @@ interface SidebarProps {
   onFilterChange: (filter: ProjectFilter) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  creditsRemaining?: number;
+  creditsLimit?: number;
 }
 
 const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter }[] = [
@@ -34,6 +37,7 @@ const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter 
 
 export default function Sidebar({
   projects, open, onClose, activeFilter, onFilterChange, searchQuery, onSearchChange,
+  creditsRemaining, creditsLimit,
 }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -144,9 +148,14 @@ export default function Sidebar({
               <div className="px-3 pb-2">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-medium text-gray-600">Credits</span>
-                  <span className="text-xs font-semibold text-gray-800">0.9 left</span>
+                  <span className="text-xs font-semibold text-gray-800">
+                    {creditsRemaining ?? "-"} / {creditsLimit ?? "-"} left
+                  </span>
                 </div>
-                <Progress value={18} className="h-1.5 bg-gray-200 [&>div]:bg-violet-500" />
+                <Progress
+                  value={creditsLimit ? Math.max(0, Math.min(100, (creditsRemaining ?? 0) / creditsLimit * 100)) : 0}
+                  className="h-1.5 bg-gray-200 [&>div]:bg-violet-500"
+                />
                 <p className="text-[10px] text-gray-400 mt-1">Daily credits reset at midnight UTC</p>
               </div>
 
@@ -249,7 +258,7 @@ export default function Sidebar({
                   >
                     <FileText className="h-4 w-4 text-gray-400" />
                     <span className="flex-1 text-left truncate">{p.title}</span>
-                    {p.is_public && <Star className="h-3 w-3 text-amber-400 fill-amber-400" />}
+                    {p.is_starred && <Star className="h-3 w-3 text-amber-400 fill-amber-400" />}
                   </button>
                 ))}
               </div>
