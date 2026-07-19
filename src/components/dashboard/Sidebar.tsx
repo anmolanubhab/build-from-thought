@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Project } from "@/lib/projects";
 import {
-  Home, Search, BookOpen, LayoutGrid, Star, UserCircle, Users,
+  Home, Search, BookOpen, LayoutGrid, Star, UserCircle, Users, Plug,
   FileText, ChevronDown, Sparkles, Zap, X, LogOut, Settings, UserPlus,
   Check, Plus,
 } from "lucide-react";
@@ -77,6 +77,11 @@ export default function Sidebar({
     {
       icon: BookOpen, label: "Resources", id: "resources", shortcut: "",
       onClick: () => navigate("/dashboard/resources"),
+      active: false,
+    },
+    {
+      icon: Plug, label: "Connectors", id: "connectors", shortcut: "",
+      onClick: () => navigate("/dashboard/resources?connectors"),
       active: false,
     },
   ];
