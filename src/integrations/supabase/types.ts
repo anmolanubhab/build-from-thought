@@ -61,6 +61,7 @@ export type Database = {
           error_message: string | null
           external_id: string | null
           id: string
+          production_alias: string | null
           project_id: string
           provider: string
           status: string
@@ -73,6 +74,7 @@ export type Database = {
           error_message?: string | null
           external_id?: string | null
           id?: string
+          production_alias?: string | null
           project_id: string
           provider?: string
           status?: string
@@ -85,6 +87,7 @@ export type Database = {
           error_message?: string | null
           external_id?: string | null
           id?: string
+          production_alias?: string | null
           project_id?: string
           provider?: string
           status?: string
