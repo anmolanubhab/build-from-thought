@@ -86,42 +86,56 @@ export default function Sidebar({
     },
   ];
 
+  const wbSurface = { background: "var(--wb-surface)" };
+  const wbLine = { borderColor: "var(--wb-line)" };
+
   return (
     <>
       {open && (
-        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
       )}
       <aside
         className={`
           fixed lg:sticky top-0 left-0 z-50 h-screen w-[260px] flex-shrink-0
-          bg-white border-r border-gray-200 flex flex-col
+          border-r flex flex-col wb-sans
           transition-transform duration-300
           ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
+        style={{ background: "var(--wb-canvas)", borderColor: "var(--wb-line)" }}
       >
         {/* Top: Workspace Dropdown */}
-        <div className="p-3 border-b border-gray-100">
+        <div className="p-3 border-b relative" style={wbLine}>
           <Popover open={wsOpen} onOpenChange={setWsOpen}>
             <PopoverTrigger asChild>
-              <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="h-6 w-6 rounded-md bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+              <button
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:brightness-125"
+                style={wbSurface}
+              >
+                <div className="h-6 w-6 rounded-md flex items-center justify-center" style={{ background: "var(--wb-ember)" }}>
                   <Sparkles className="h-3.5 w-3.5 text-white" />
                 </div>
-                <span className="text-sm font-semibold text-gray-900 truncate flex-1 text-left">
+                <span className="wb-display text-sm font-semibold truncate flex-1 text-left" style={{ color: "var(--wb-text)" }}>
                   WebdevsAI Workspace
                 </span>
-                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${wsOpen ? "rotate-180" : ""}`} />
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${wsOpen ? "rotate-180" : ""}`}
+                  style={{ color: "var(--wb-text-muted)" }}
+                />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="start" sideOffset={6} className="w-[280px] p-0 rounded-lg shadow-lg border border-gray-200 bg-white">
+            <PopoverContent
+              align="start" sideOffset={6}
+              className="w-[280px] p-0 rounded-lg shadow-lg border"
+              style={{ background: "var(--wb-surface)", borderColor: "var(--wb-line)" }}
+            >
               {/* Workspace Info */}
               <div className="px-3 pt-3 pb-2 flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-md bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
+                <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "var(--wb-ember)" }}>
                   <Sparkles className="h-4 w-4 text-white" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">WebdevsAI Workspace</p>
-                  <p className="text-xs text-gray-500">Free Plan • 2 members</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: "var(--wb-text)" }}>WebdevsAI Workspace</p>
+                  <p className="wb-mono text-[11px]" style={{ color: "var(--wb-text-muted)" }}>Free Plan · 2 members</p>
                 </div>
               </div>
 
@@ -129,22 +143,27 @@ export default function Sidebar({
               <div className="px-3 pb-2 flex gap-2">
                 <button
                   onClick={() => { setWsOpen(false); setSettingsOpen(true); }}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors hover:brightness-125"
+                  style={{ ...wbLine, color: "var(--wb-text)" }}
                 >
                   <Settings className="h-3.5 w-3.5" /> Settings
                 </button>
                 <button
                   onClick={copyInviteLink}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors hover:brightness-125"
+                  style={{ ...wbLine, color: "var(--wb-text)" }}
                 >
                   <UserPlus className="h-3.5 w-3.5" /> Invite
                 </button>
               </div>
 
               {/* Upgrade */}
-              <div className="mx-3 mb-2 flex items-center justify-between px-3 py-2 rounded-md bg-gray-50">
-                <span className="text-xs font-semibold text-gray-800">Turn Pro</span>
-                <button className="px-3 py-1 rounded-md bg-violet-600 text-white text-xs font-medium hover:bg-violet-700 transition-colors">
+              <div className="mx-3 mb-2 flex items-center justify-between px-3 py-2 rounded-md" style={{ background: "var(--wb-surface-raised)" }}>
+                <span className="text-xs font-semibold" style={{ color: "var(--wb-text)" }}>Turn Pro</span>
+                <button
+                  className="px-3 py-1 rounded-md text-white text-xs font-medium transition-opacity hover:opacity-90"
+                  style={{ background: "var(--wb-ember)" }}
+                >
                   Upgrade
                 </button>
               </div>
@@ -152,31 +171,31 @@ export default function Sidebar({
               {/* Credits */}
               <div className="px-3 pb-2">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-gray-600">Credits</span>
-                  <span className="text-xs font-semibold text-gray-800">
+                  <span className="wb-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--wb-text-muted)" }}>Credits</span>
+                  <span className="wb-mono text-xs font-medium" style={{ color: "var(--wb-circuit)" }}>
                     {creditsRemaining ?? "-"} / {creditsLimit ?? "-"} left
                   </span>
                 </div>
                 <Progress
                   value={creditsLimit ? Math.max(0, Math.min(100, (creditsRemaining ?? 0) / creditsLimit * 100)) : 0}
-                  className="h-1.5 bg-gray-200 [&>div]:bg-violet-500"
+                  className="h-1.5 bg-[var(--wb-surface-raised)] [&>div]:bg-[var(--wb-ember)]"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">Daily credits reset at midnight UTC</p>
+                <p className="wb-mono text-[10px] mt-1" style={{ color: "var(--wb-text-muted)" }}>Daily credits reset at midnight UTC</p>
               </div>
 
               {/* Divider */}
-              <div className="border-t border-gray-100" />
+              <div className="border-t" style={wbLine} />
 
               {/* All Workspaces */}
               <div className="px-3 pt-2 pb-1">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">All workspaces</p>
-                <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md bg-gray-50">
-                  <div className="h-6 w-6 rounded-md bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
+                <p className="wb-mono text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--wb-text-muted)" }}>All workspaces</p>
+                <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md" style={{ background: "var(--wb-surface-raised)" }}>
+                  <div className="h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "var(--wb-ember)" }}>
                     <Sparkles className="h-3 w-3 text-white" />
                   </div>
-                  <span className="text-xs font-medium text-gray-900 flex-1 truncate">WebdevsAI Workspace</span>
-                  <span className="text-[10px] font-medium text-gray-500 border border-gray-200 rounded px-1.5 py-0.5">FREE</span>
-                  <Check className="h-3.5 w-3.5 text-violet-600" />
+                  <span className="text-xs font-medium flex-1 truncate" style={{ color: "var(--wb-text)" }}>WebdevsAI Workspace</span>
+                  <span className="wb-mono text-[10px] font-medium border rounded px-1.5 py-0.5" style={{ ...wbLine, color: "var(--wb-text-muted)" }}>FREE</span>
+                  <Check className="h-3.5 w-3.5" style={{ color: "var(--wb-circuit)" }} />
                 </div>
               </div>
 
@@ -184,14 +203,15 @@ export default function Sidebar({
               <div className="px-3 pb-3 pt-1">
                 <button
                   onClick={createWorkspace}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors border border-dashed border-gray-200"
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors border border-dashed hover:brightness-125"
+                  style={{ ...wbLine, color: "var(--wb-text-muted)" }}
                 >
                   <Plus className="h-3.5 w-3.5" /> Create new workspace
                 </button>
               </div>
             </PopoverContent>
           </Popover>
-          <button onClick={onClose} className="absolute top-3 right-3 lg:hidden text-gray-500 hover:text-gray-700">
+          <button onClick={onClose} className="absolute top-3 right-3 lg:hidden" style={{ color: "var(--wb-text-muted)" }}>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -203,16 +223,17 @@ export default function Sidebar({
               <button
                 key={item.id}
                 onClick={item.onClick}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                  item.active
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
+                className="w-full flex items-center gap-2.5 pl-2.5 pr-2.5 py-1.5 text-[13px] font-medium transition-colors border-l-2 rounded-r-md"
+                style={{
+                  borderLeftColor: item.active ? "var(--wb-ember)" : "transparent",
+                  background: item.active ? "var(--wb-surface)" : "transparent",
+                  color: item.active ? "var(--wb-text)" : "var(--wb-text-muted)",
+                }}
               >
                 <item.icon className="h-4 w-4" />
                 <span className="flex-1 text-left">{item.label}</span>
                 {item.shortcut && (
-                  <span className="text-[11px] text-gray-400 font-normal">{item.shortcut}</span>
+                  <span className="wb-mono text-[10px] font-normal" style={{ color: "var(--wb-text-muted)" }}>{item.shortcut}</span>
                 )}
               </button>
             ))}
@@ -223,7 +244,8 @@ export default function Sidebar({
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
                   placeholder="Search projects..."
-                  className="h-8 text-[13px]"
+                  className="h-8 text-[13px] wb-sans"
+                  style={{ background: "var(--wb-surface)", borderColor: "var(--wb-line)", color: "var(--wb-text)" }}
                 />
               </div>
             )}
@@ -231,17 +253,18 @@ export default function Sidebar({
 
           {/* Projects */}
           <div>
-            <span className="px-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Projects</span>
+            <span className="px-2.5 wb-mono text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--wb-text-muted)" }}>Projects</span>
             <div className="mt-1 space-y-0.5">
               {projectItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => onFilterChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                    activeFilter === item.id
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
+                  className="w-full flex items-center gap-2.5 pl-2.5 pr-2.5 py-1.5 text-[13px] font-medium transition-colors border-l-2 rounded-r-md"
+                  style={{
+                    borderLeftColor: activeFilter === item.id ? "var(--wb-circuit)" : "transparent",
+                    background: activeFilter === item.id ? "var(--wb-surface)" : "transparent",
+                    color: activeFilter === item.id ? "var(--wb-text)" : "var(--wb-text-muted)",
+                  }}
                 >
                   <item.icon className="h-4 w-4" />
                   <span className="flex-1 text-left">{item.label}</span>
@@ -253,17 +276,18 @@ export default function Sidebar({
           {/* Recents */}
           {recentProjects.length > 0 && (
             <div>
-              <span className="px-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Recents</span>
+              <span className="px-2.5 wb-mono text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--wb-text-muted)" }}>Recents</span>
               <div className="mt-1 space-y-0.5">
                 {recentProjects.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => navigate(`/editor/${p.id}`)}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors hover:brightness-125"
+                    style={{ color: "var(--wb-text-muted)" }}
                   >
-                    <FileText className="h-4 w-4 text-gray-400" />
+                    <FileText className="h-4 w-4 flex-shrink-0" style={{ color: "var(--wb-text-muted)" }} />
                     <span className="flex-1 text-left truncate">{p.title}</span>
-                    {p.is_starred && <Star className="h-3 w-3 text-amber-400 fill-amber-400" />}
+                    {p.is_starred && <Star className="h-3 w-3 flex-shrink-0" style={{ color: "var(--wb-ember)", fill: "var(--wb-ember)" }} />}
                   </button>
                 ))}
               </div>
@@ -272,42 +296,44 @@ export default function Sidebar({
         </nav>
 
         {/* Bottom Cards */}
-        <div className="p-2 space-y-1.5 border-t border-gray-100">
+        <div className="p-2 space-y-1.5 border-t" style={wbLine}>
           <div
             onClick={copyInviteLink}
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125"
+            style={wbSurface}
           >
-            <div className="h-7 w-7 rounded-md bg-gray-200 flex items-center justify-center">
-              <Users className="h-3.5 w-3.5 text-gray-500" />
+            <div className="h-7 w-7 rounded-md flex items-center justify-center" style={{ background: "var(--wb-surface-raised)" }}>
+              <Users className="h-3.5 w-3.5" style={{ color: "var(--wb-circuit)" }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-gray-900">Share WebdevsAI</p>
-              <p className="text-[11px] text-gray-400">5 credits per referral</p>
+              <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Share WebdevsAI</p>
+              <p className="wb-mono text-[10px]" style={{ color: "var(--wb-text-muted)" }}>5 credits per referral</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
-            <div className="h-7 w-7 rounded-md bg-amber-100 flex items-center justify-center">
-              <Zap className="h-3.5 w-3.5 text-amber-600" />
+          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125" style={wbSurface}>
+            <div className="h-7 w-7 rounded-md flex items-center justify-center" style={{ background: "var(--wb-surface-raised)" }}>
+              <Zap className="h-3.5 w-3.5" style={{ color: "var(--wb-ember)" }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-gray-900">Upgrade to Pro</p>
-              <p className="text-[11px] text-gray-400">Unlock more benefits</p>
+              <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Upgrade to Pro</p>
+              <p className="wb-mono text-[10px]" style={{ color: "var(--wb-text-muted)" }}>Unlock more benefits</p>
             </div>
           </div>
 
           <div className="flex items-center justify-between px-2.5 py-1.5">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--wb-ember)" }}>
                 <span className="text-xs text-white font-semibold">
                   {user?.name?.charAt(0)?.toUpperCase() || "U"}
                 </span>
               </div>
-              <span className="text-[13px] text-gray-600 truncate max-w-[120px]">{user?.email}</span>
+              <span className="text-[13px] truncate max-w-[120px]" style={{ color: "var(--wb-text-muted)" }}>{user?.email}</span>
             </div>
             <button
               onClick={logout}
-              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+              className="p-1 rounded transition-colors hover:text-red-400"
+              style={{ color: "var(--wb-text-muted)" }}
               title="Logout"
             >
               <LogOut className="h-4 w-4" />
