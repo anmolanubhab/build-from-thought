@@ -1,14 +1,20 @@
+// path: src/pages/Editor.tsx
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Menu, X } from "lucide-react";
+import { ArrowLeft, Menu, X, History, Eye, Rocket, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { editProject, EditResult } from "@/services/edit";
 import type { Project, PageData } from "@/lib/projects";
 import { getProjectPages } from "@/lib/projects";
+import {
+  fetchOpenDraft, createDraft, updateDraft, discardDraft, publishVersion,
+  createPreviewDeployment, type ProjectVersion,
+} from "@/services/versions";
 import PromptPanel, { PromptEntry } from "@/components/editor/PromptPanel";
 import PreviewPanel from "@/components/editor/PreviewPanel";
+import VersionHistoryDialog from "@/components/editor/VersionHistoryDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ProjectSnapshot {
@@ -25,12 +31,19 @@ export default function Editor() {
   const isMobile = useIsMobile();
 
   const [project, setProject] = useState<Project | null>(null);
+  const [liveSnapshot, setLiveSnapshot] = useState<ProjectSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState<PromptEntry[]>([]);
   const [undoStack, setUndoStack] = useState<ProjectSnapshot[]>([]);
   const [previewChanges, setPreviewChanges] = useState<EditResult | null>(null);
   const [panelOpen, setPanelOpen] = useState(!isMobile);
+
+  const [draft, setDraft] = useState<ProjectVersion | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -47,20 +60,37 @@ export default function Editor() {
         navigate("/dashboard");
         return;
       }
-      setProject(data as unknown as Project);
+      const loaded = data as unknown as Project;
+      setProject(loaded);
+      setLiveSnapshot({ html: loaded.html || "", css: loaded.css || "", react_code: loaded.react_code || "", pages: loaded.pages });
+
+      // Resume an in-progress draft, if one exists, so a refresh doesn't lose it.
+      try {
+        const openDraft = await fetchOpenDraft(id);
+        if (openDraft) {
+          setDraft(openDraft);
+          setProject((prev) => prev ? { ...prev, html: openDraft.html || "", css: openDraft.css || "", react_code: openDraft.react_code || "", pages: openDraft.pages } : prev);
+        }
+      } catch (err) {
+        console.error("Failed to load open draft:", err);
+      }
+
       setLoading(false);
     })();
   }, [id, user, navigate]);
 
-  const saveProjectToDB = useCallback(
-    async (html: string, css: string, react_code: string, pages?: PageData[] | null) => {
+  const saveDraft = useCallback(
+    async (html: string, css: string, react_code: string, pages: PageData[] | null | undefined, summary: string) => {
       if (!id) return;
-      await supabase
-        .from("projects")
-        .update({ html, css, react_code, pages: pages as any, updated_at: new Date().toISOString() } as any)
-        .eq("id", id);
+      if (draft) {
+        const updated = await updateDraft(draft.id, { html, css, react_code, pages }, summary);
+        setDraft(updated);
+      } else {
+        const created = await createDraft(id, { html, css, react_code, pages }, summary);
+        setDraft(created);
+      }
     },
-    [id]
+    [id, draft]
   );
 
   const handleSubmit = async (prompt: string, mode: "apply" | "suggest") => {
@@ -91,10 +121,10 @@ export default function Editor() {
 
         const updated: Project = { ...project, html: result.html, css: result.css, react_code: result.react_code };
         setProject(updated);
-        await saveProjectToDB(result.html, result.css, result.react_code, project.pages);
+        await saveDraft(result.html, result.css, result.react_code, project.pages, result.summary || prompt);
 
         setHistory((prev) => prev.map((e) => e.id === entryId ? { ...e, status: "success", summary: result.summary, changes: result.changes } : e));
-        toast({ title: "Changes applied", description: result.summary });
+        toast({ title: "Draft updated", description: "Preview or publish when you're ready." });
       }
     } catch (err) {
       setHistory((prev) => prev.map((e) => (e.id === entryId ? { ...e, status: "error" } : e)));
@@ -111,7 +141,7 @@ export default function Editor() {
 
     const updated: Project = { ...project, html: prev.html, css: prev.css, react_code: prev.react_code, pages: prev.pages };
     setProject(updated);
-    await saveProjectToDB(prev.html, prev.css, prev.react_code, prev.pages);
+    await saveDraft(prev.html, prev.css, prev.react_code, prev.pages, "Undo");
     toast({ title: "Change undone" });
   };
 
@@ -124,9 +154,64 @@ export default function Editor() {
 
     const updated: Project = { ...project, html: previewChanges.html, css: previewChanges.css, react_code: previewChanges.react_code };
     setProject(updated);
-    await saveProjectToDB(previewChanges.html, previewChanges.css, previewChanges.react_code, project.pages);
+    await saveDraft(previewChanges.html, previewChanges.css, previewChanges.react_code, project.pages, previewChanges.summary);
     setPreviewChanges(null);
-    toast({ title: "Changes accepted", description: previewChanges.summary });
+    toast({ title: "Draft updated", description: previewChanges.summary });
+  };
+
+  const handlePublish = async () => {
+    if (!draft) return;
+    setPublishing(true);
+    try {
+      await publishVersion(draft.id);
+      setLiveSnapshot({ html: draft.html || "", css: draft.css || "", react_code: draft.react_code || "", pages: draft.pages });
+      setDraft(null);
+      toast({ title: "Published!", description: "Your changes are now live." });
+    } catch (err) {
+      toast({ title: "Publish failed", description: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleDiscardDraft = async () => {
+    if (!draft || !liveSnapshot) return;
+    setDiscarding(true);
+    try {
+      await discardDraft(draft.id);
+      setDraft(null);
+      setProject((prev) => prev ? { ...prev, ...liveSnapshot } : prev);
+      toast({ title: "Draft discarded" });
+    } catch (err) {
+      toast({ title: "Couldn't discard draft", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
+  const handlePreviewDraft = async () => {
+    if (!draft || !project) return;
+    setPreviewing(true);
+    try {
+      const result = await createPreviewDeployment(project.id, draft.id);
+      window.open(result.url, "_blank");
+      toast({ title: "Preview opened", description: "It may take a few seconds to finish building." });
+    } catch (err) {
+      toast({ title: "Preview failed", description: err instanceof Error ? err.message : "Connect Vercel first from Resources → Connectors.", variant: "destructive" });
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const handleRolledBack = async () => {
+    if (!id || !user) return;
+    const { data } = await supabase.from("projects").select("*").eq("id", id).eq("user_id", user.id).single();
+    if (data) {
+      const reloaded = data as unknown as Project;
+      setProject(reloaded);
+      setLiveSnapshot({ html: reloaded.html || "", css: reloaded.css || "", react_code: reloaded.react_code || "", pages: reloaded.pages });
+      setDraft(null);
+    }
   };
 
   if (loading) {
@@ -152,12 +237,49 @@ export default function Editor() {
           <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{pages.length} pages</span>
         )}
         <div className="flex-1" />
+        <button
+          onClick={() => setHistoryOpen(true)}
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+          title="Version history"
+        >
+          <History className="h-4 w-4" />
+        </button>
         {isMobile && (
           <button onClick={() => setPanelOpen(!panelOpen)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
             {panelOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         )}
       </div>
+
+      {draft && (
+        <div className="h-11 bg-amber-50 border-b border-amber-200 flex items-center px-3 gap-2 flex-shrink-0">
+          <span className="text-xs font-medium text-amber-800">
+            Draft · unpublished changes {draft.summary ? `— ${draft.summary}` : ""}
+          </span>
+          <div className="flex-1" />
+          <button
+            onClick={handlePreviewDraft}
+            disabled={previewing}
+            className="flex items-center gap-1 text-xs font-medium text-amber-800 hover:text-amber-900 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors"
+          >
+            {previewing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />} Preview
+          </button>
+          <button
+            onClick={handleDiscardDraft}
+            disabled={discarding}
+            className="flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 px-2 py-1 rounded-md hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="h-3 w-3" /> Discard
+          </button>
+          <button
+            onClick={handlePublish}
+            disabled={publishing}
+            className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-md transition-colors"
+          >
+            {publishing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />} Publish
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden relative">
         <div className={`${isMobile ? "absolute inset-0 z-30" : "w-[360px] flex-shrink-0 border-r border-gray-200"} ${isMobile && !panelOpen ? "hidden" : ""} transition-all`}>
@@ -180,6 +302,13 @@ export default function Editor() {
           />
         </div>
       </div>
+
+      <VersionHistoryDialog
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        projectId={project.id}
+        onRolledBack={handleRolledBack}
+      />
     </div>
   );
 }
