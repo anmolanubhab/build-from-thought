@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Project } from "@/lib/projects";
 import {
@@ -8,31 +9,55 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
+
+export type ProjectFilter = "all" | "starred" | "mine" | "shared";
 
 interface SidebarProps {
   projects: Project[];
   open: boolean;
   onClose: () => void;
+  activeFilter: ProjectFilter;
+  onFilterChange: (filter: ProjectFilter) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
-const menuItems = [
-  { icon: Home, label: "Home", id: "home", shortcut: "" },
-  { icon: Search, label: "Search", id: "search", shortcut: "Ctrl K" },
-  { icon: BookOpen, label: "Resources", id: "resources", shortcut: "" },
-];
-
-const projectItems = [
+const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter }[] = [
   { icon: LayoutGrid, label: "All projects", id: "all" },
   { icon: Star, label: "Starred", id: "starred" },
   { icon: UserCircle, label: "Created by me", id: "mine" },
   { icon: Users, label: "Shared with me", id: "shared" },
 ];
 
-export default function Sidebar({ projects, open, onClose }: SidebarProps) {
+export default function Sidebar({
+  projects, open, onClose, activeFilter, onFilterChange, searchQuery, onSearchChange,
+}: SidebarProps) {
   const { user, logout } = useAuth();
-  const [activeItem, setActiveItem] = useState("home");
+  const navigate = useNavigate();
   const [wsOpen, setWsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const recentProjects = projects.slice(0, 3);
+
+  const goHome = () => {
+    onFilterChange("all");
+    onSearchChange("");
+    setSearchOpen(false);
+  };
+
+  const menuItems = [
+    { icon: Home, label: "Home", id: "home", shortcut: "", onClick: goHome, active: activeFilter === "all" && !searchQuery },
+    {
+      icon: Search, label: "Search", id: "search", shortcut: "Ctrl K",
+      onClick: () => setSearchOpen((v) => !v), active: searchOpen,
+    },
+    {
+      icon: BookOpen, label: "Resources", id: "resources", shortcut: "",
+      onClick: () => toast({ title: "Resources", description: "Docs and guides are coming soon." }),
+      active: false,
+    },
+  ];
 
   return (
     <>
@@ -136,9 +161,9 @@ export default function Sidebar({ projects, open, onClose }: SidebarProps) {
             {menuItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveItem(item.id)}
+                onClick={item.onClick}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                  activeItem === item.id
+                  item.active
                     ? "bg-gray-100 text-gray-900"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
@@ -150,6 +175,17 @@ export default function Sidebar({ projects, open, onClose }: SidebarProps) {
                 )}
               </button>
             ))}
+            {searchOpen && (
+              <div className="px-1 pt-1">
+                <Input
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  placeholder="Search projects..."
+                  className="h-8 text-[13px]"
+                />
+              </div>
+            )}
           </div>
 
           {/* Projects */}
@@ -159,9 +195,9 @@ export default function Sidebar({ projects, open, onClose }: SidebarProps) {
               {projectItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveItem(item.id)}
+                  onClick={() => onFilterChange(item.id)}
                   className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                    activeItem === item.id
+                    activeFilter === item.id
                       ? "bg-gray-100 text-gray-900"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                   }`}
@@ -181,6 +217,7 @@ export default function Sidebar({ projects, open, onClose }: SidebarProps) {
                 {recentProjects.map((p) => (
                   <button
                     key={p.id}
+                    onClick={() => navigate(`/editor/${p.id}`)}
                     className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                   >
                     <FileText className="h-4 w-4 text-gray-400" />
