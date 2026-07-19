@@ -1,9 +1,15 @@
 // path: src/pages/Resources.tsx
 import { useNavigate } from "react-router-dom";
-import { Menu, User, LayoutDashboard, Rocket, Building2, Newspaper, ArrowRight } from "lucide-react";
-import { useState } from "react";
+import {
+  Menu, User, LayoutDashboard, Rocket, Building2, Newspaper, ArrowRight,
+  Github, Database, Sparkles, CheckCircle2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import type { ProjectFilter } from "@/components/dashboard/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { getGitHubStatus } from "@/services/github";
+import { ConnectGitHubButton } from "@/components/dashboard/GitHubButton";
 
 interface Template {
   id: string;
@@ -63,9 +69,33 @@ const templates: Template[] = [
   },
 ];
 
+type Tab = "templates" | "connectors";
+
 export default function Resources() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>(
+    new URLSearchParams(window.location.search).has("connectors") ? "connectors" : "templates"
+  );
+  const [ghConnected, setGhConnected] = useState(false);
+  const [ghUsername, setGhUsername] = useState<string>();
+
+  const refreshGitHub = () => {
+    getGitHubStatus().then(({ connected, username }) => {
+      setGhConnected(connected);
+      setGhUsername(username);
+    });
+  };
+
+  useEffect(() => {
+    refreshGitHub();
+  }, []);
+
+  const switchTab = (next: Tab) => {
+    setTab(next);
+    const url = next === "connectors" ? "/dashboard/resources?connectors" : "/dashboard/resources";
+    window.history.replaceState({}, "", url);
+  };
 
   const useTemplate = (t: Template) => {
     const params = new URLSearchParams({
@@ -75,7 +105,6 @@ export default function Resources() {
     navigate(`/dashboard?${params.toString()}`);
   };
 
-  // Sidebar needs these props but Resources doesn't manage a project list/filter itself.
   const noop = () => {};
 
   return (
@@ -100,31 +129,115 @@ export default function Resources() {
         <main className="flex-1 overflow-auto p-6 md:p-10">
           <div className="max-w-5xl mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Resources</h1>
-            <p className="text-gray-500 mb-8">Start from a template and let AI fill in the details.</p>
+            <p className="text-gray-500 mb-6">
+              {tab === "templates"
+                ? "Start from a template and let AI fill in the details."
+                : "Manage the services connected to your workspace."}
+            </p>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {templates.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => useTemplate(t)}
-                  className="text-left rounded-2xl overflow-hidden border border-gray-100 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group"
-                >
-                  <div
-                    className="h-28 flex items-center justify-center"
-                    style={{ background: `linear-gradient(135deg, ${t.color}22, ${t.color}08)` }}
-                  >
-                    <t.icon className="h-9 w-9" style={{ color: t.color }} />
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-1">{t.title}</h3>
-                    <p className="text-xs text-gray-500 mb-3">{t.description}</p>
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 group-hover:gap-1.5 transition-all">
-                      Use this template <ArrowRight className="h-3 w-3" />
-                    </span>
-                  </div>
-                </button>
-              ))}
+            {/* Tabs */}
+            <div className="flex items-center gap-1 mb-8 border-b border-gray-200">
+              <button
+                onClick={() => switchTab("templates")}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  tab === "templates" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Templates
+              </button>
+              <button
+                onClick={() => switchTab("connectors")}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  tab === "connectors" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Connectors
+              </button>
             </div>
+
+            {tab === "templates" ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => useTemplate(t)}
+                    className="text-left rounded-2xl overflow-hidden border border-gray-100 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group"
+                  >
+                    <div
+                      className="h-28 flex items-center justify-center"
+                      style={{ background: `linear-gradient(135deg, ${t.color}22, ${t.color}08)` }}
+                    >
+                      <t.icon className="h-9 w-9" style={{ color: t.color }} />
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1">{t.title}</h3>
+                      <p className="text-xs text-gray-500 mb-3">{t.description}</p>
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 group-hover:gap-1.5 transition-all">
+                        Use this template <ArrowRight className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4 max-w-2xl">
+                {/* GitHub - user-managed connector */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-lg bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <Github className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-gray-900">GitHub</h3>
+                        {ghConnected && (
+                          <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="h-2.5 w-2.5" /> Connected{ghUsername ? ` as ${ghUsername}` : ""}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">Push generated projects straight to a new repo.</p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <ConnectGitHubButton connected={ghConnected} username={ghUsername} onStatusChange={refreshGitHub} />
+                  </div>
+                </div>
+
+                {/* Supabase - platform-level, always on */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-lg bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <Database className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-gray-900">Supabase</h3>
+                        <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 className="h-2.5 w-2.5" /> Active
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">Powers your database, auth, and storage. Built in — nothing to connect.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gemini AI - platform-level, always on */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-lg bg-violet-600 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-gray-900">Google Gemini</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Powers AI app generation. Configured on the backend for your workspace.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-400 pt-2">More connectors (Slack, Notion, and others) are on the roadmap.</p>
+              </div>
+            )}
           </div>
         </main>
       </div>
