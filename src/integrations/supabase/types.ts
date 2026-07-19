@@ -1,3 +1,4 @@
+// path: src/integrations/supabase/types.ts
 export type Json =
   | string
   | number
@@ -115,6 +116,9 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          credits_daily_limit: number
+          credits_remaining: number
+          credits_reset_at: string
           display_name: string | null
           id: string
           updated_at: string
@@ -123,6 +127,9 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          credits_daily_limit?: number
+          credits_remaining?: number
+          credits_reset_at?: string
           display_name?: string | null
           id: string
           updated_at?: string
@@ -131,6 +138,9 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          credits_daily_limit?: number
+          credits_remaining?: number
+          credits_reset_at?: string
           display_name?: string | null
           id?: string
           updated_at?: string
@@ -179,6 +189,7 @@ export type Database = {
           id: string
           is_multipage: boolean
           is_public: boolean
+          is_starred: boolean
           pages: Json | null
           prompt: string
           react_code: string | null
@@ -197,6 +208,7 @@ export type Database = {
           id?: string
           is_multipage?: boolean
           is_public?: boolean
+          is_starred?: boolean
           pages?: Json | null
           prompt: string
           react_code?: string | null
@@ -215,6 +227,7 @@ export type Database = {
           id?: string
           is_multipage?: boolean
           is_public?: boolean
+          is_starred?: boolean
           pages?: Json | null
           prompt?: string
           react_code?: string | null
