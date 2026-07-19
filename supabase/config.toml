@@ -1,0 +1,13 @@
+project_id = "pclbntueuigcsaxsixeu"
+
+[functions.generate-app]
+verify_jwt = false
+
+[functions.github-auth]
+verify_jwt = false
+
+[functions.github-callback]
+verify_jwt = false
+
+[functions.github-push]
+verify_jwt = false
