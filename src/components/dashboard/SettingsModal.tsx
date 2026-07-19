@@ -80,19 +80,19 @@ export default function SettingsModal({ open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-white border-gray-200 sm:max-w-md">
+      <DialogContent className="bg-[var(--wb-surface)] border-[var(--wb-line)] sm:max-w-md wb-sans">
         <DialogHeader>
-          <DialogTitle className="text-gray-900">Settings</DialogTitle>
+          <DialogTitle className="text-[var(--wb-text)]">Settings</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
           <div className="space-y-1.5">
-            <Label htmlFor="settings-email" className="text-gray-600">Email</Label>
-            <Input id="settings-email" value={user?.email || ""} disabled className="bg-gray-50" />
+            <Label htmlFor="settings-email" className="text-[var(--wb-text-muted)]">Email</Label>
+            <Input id="settings-email" value={user?.email || ""} disabled className="bg-[var(--wb-surface-raised)] border-[var(--wb-line)] text-[var(--wb-text-muted)]" />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="settings-name" className="text-gray-600">Display name</Label>
+            <Label htmlFor="settings-name" className="text-[var(--wb-text-muted)]">Display name</Label>
             <div className="flex gap-2">
               <Input
                 id="settings-name"
@@ -110,7 +110,7 @@ export default function SettingsModal({ open, onClose }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="settings-password" className="text-gray-600">New password</Label>
+            <Label htmlFor="settings-password" className="text-[var(--wb-text-muted)]">New password</Label>
             <div className="flex gap-2">
               <Input
                 id="settings-password"
