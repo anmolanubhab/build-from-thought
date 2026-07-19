@@ -69,6 +69,7 @@ export default function Sidebar({
     onFilterChange("all");
     onSearchChange("");
     setSearchOpen(false);
+    navigate("/dashboard");
   };
 
   const menuItems = [
