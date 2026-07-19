@@ -1,101 +1,124 @@
-// path: src/components/landing/Pricing.tsx
+// path: src/components/landing/PlanInterestDialog.tsx
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import PlanInterestDialog from "./PlanInterestDialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/hooks/use-toast";
+import { CheckCircle } from "lucide-react";
 
-const plans = [
-  {
-    id: "free" as const,
-    name: "Free",
-    price: "$0",
-    period: "/month",
-    features: ["5 projects", "AI prompt builder", "Community support", "Basic templates"],
-    cta: "Start Free",
-    highlighted: false,
-  },
-  {
-    id: "pro" as const,
-    name: "Pro",
-    price: "$29",
-    period: "/month",
-    features: ["Unlimited projects", "Full-stack export", "Priority support", "All templates", "Custom domains"],
-    cta: "Join Waitlist",
-    highlighted: true,
-  },
-  {
-    id: "enterprise" as const,
-    name: "Enterprise",
-    price: "Custom",
-    period: "",
-    features: ["Unlimited everything", "Dedicated support", "SSO & SAML", "SLA guarantee", "On-premise option"],
-    cta: "Contact Sales",
-    highlighted: false,
-  },
-];
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  plan: "pro" | "enterprise";
+}
 
-const Pricing = () => {
-  const [dialogPlan, setDialogPlan] = useState<"pro" | "enterprise" | null>(null);
+export default function PlanInterestDialog({ open, onClose, plan }: Props) {
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const reset = () => {
+    setEmail("");
+    setMessage("");
+    setSubmitted(false);
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!email.trim()) return;
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("plan_interest").insert({
+        email: email.trim(),
+        plan,
+        message: message.trim() || null,
+      } as any);
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (err) {
+      toast({
+        title: "Couldn't submit",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isPro = plan === "pro";
 
   return (
-    <section id="pricing" className="py-20 lg:py-28">
-      <div className="container mx-auto px-4">
-        <h2 className="font-display text-3xl lg:text-4xl font-bold text-center mb-4">
-          Simple <span className="gradient-text">Pricing</span>
-        </h2>
-        <p className="text-center text-muted-foreground mb-16 max-w-xl mx-auto">
-          Start free, upgrade when you're ready.
-        </p>
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent className="sm:max-w-md">
+        {submitted ? (
+          <div className="py-6 text-center space-y-3">
+            <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto" />
+            <p className="font-semibold text-foreground">
+              {isPro ? "You're on the waitlist!" : "Thanks — we'll be in touch"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {isPro
+                ? "We'll email you as soon as Pro plans are available."
+                : "Our team will reach out to your email about Enterprise."}
+            </p>
+            <Button onClick={handleClose} className="mt-2">Close</Button>
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>{isPro ? "Join the Pro waitlist" : "Contact Sales"}</DialogTitle>
+              <DialogDescription>
+                {isPro
+                  ? "Pro billing isn't live yet — leave your email and we'll notify you the moment it launches."
+                  : "Tell us a bit about your team and we'll follow up about Enterprise."}
+              </DialogDescription>
+            </DialogHeader>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {plans.map(({ id, name, price, period, features, cta, highlighted }, i) => (
-            <div
-              key={name}
-              className={`rounded-xl p-6 fade-up flex flex-col ${
-                highlighted ? "gradient-border glass" : "glass"
-              }`}
-              style={{ animationDelay: `${i * 0.15}s` }}
-            >
-              <h3 className="font-display text-lg font-bold text-foreground mb-1">{name}</h3>
-              <div className="mb-6">
-                <span className="font-display text-4xl font-extrabold text-foreground">{price}</span>
-                <span className="text-sm text-muted-foreground">{period}</span>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="plan-interest-email">Email</Label>
+                <Input
+                  id="plan-interest-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
-                {features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Check size={16} className="text-foreground shrink-0" /> {f}
-                  </li>
-                ))}
-              </ul>
-              {id === "free" ? (
-                <Button
-                  className={`w-full ${highlighted ? "gradient-bg text-primary-foreground border-0 hover:opacity-90" : "border-border/60"}`}
-                  variant={highlighted ? "default" : "outline"}
-                  asChild
-                >
-                  <Link to="/signup">{cta}</Link>
-                </Button>
-              ) : (
-                <Button
-                  className={`w-full ${highlighted ? "gradient-bg text-primary-foreground border-0 hover:opacity-90" : "border-border/60"}`}
-                  variant={highlighted ? "default" : "outline"}
-                  onClick={() => setDialogPlan(id)}
-                >
-                  {cta}
-                </Button>
+              {!isPro && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="plan-interest-message">What are you looking for? (optional)</Label>
+                  <Textarea
+                    id="plan-interest-message"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Team size, use case, timeline..."
+                    rows={3}
+                  />
+                </div>
               )}
             </div>
-          ))}
-        </div>
-      </div>
 
-      {dialogPlan && (
-        <PlanInterestDialog open={!!dialogPlan} onClose={() => setDialogPlan(null)} plan={dialogPlan} />
-      )}
-    </section>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button onClick={handleSubmit} disabled={submitting || !email.trim()}>
+                {submitting ? "Submitting..." : isPro ? "Join Waitlist" : "Send"}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
-};
-
-export default Pricing;
+}
