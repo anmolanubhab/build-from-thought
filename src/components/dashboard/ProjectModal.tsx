@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, Code, Download, Rocket, Copy, ExternalLink, Share2, CheckCircle, XCircle, Files } from "lucide-react";
 import { PushToGitHubButton } from "@/components/dashboard/GitHubButton";
 import DeployToVercelDialog from "@/components/dashboard/DeployToVercelDialog";
+import DomainManagerDialog from "@/components/dashboard/DomainManagerDialog";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
   const [downloading, setDownloading] = useState(false);
   const [deployStatus, setDeployStatus] = useState<DeployStatus>("idle");
   const [vercelDialogOpen, setVercelDialogOpen] = useState(false);
+  const [domainsDialogOpen, setDomainsDialogOpen] = useState(false);
   const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
   const [activePage, setActivePage] = useState(0);
 
@@ -145,6 +147,10 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
               <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50 hover:border-primary" onClick={() => setVercelDialogOpen(true)}>
                 <Rocket className="h-3 w-3" /> Deploy to Vercel
               </Button>
+
+              <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50 hover:border-primary" onClick={() => setDomainsDialogOpen(true)}>
+                Domains
+              </Button>
             </div>
           </div>
 
@@ -216,6 +222,7 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
       </DialogContent>
     </Dialog>
     <DeployToVercelDialog open={vercelDialogOpen} onClose={() => setVercelDialogOpen(false)} project={project} />
+    <DomainManagerDialog open={domainsDialogOpen} onClose={() => setDomainsDialogOpen(false)} project={project} />
     </>
   );
 }
