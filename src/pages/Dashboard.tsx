@@ -72,6 +72,14 @@ const Dashboard = () => {
 
     refreshGitHub();
 
+    const templateParams = new URLSearchParams(window.location.search);
+    const templatePrompt = templateParams.get("template_prompt");
+    if (templatePrompt) {
+      setPrompt(templatePrompt);
+      setIsMultipage(templateParams.get("template_multipage") === "true");
+      window.history.replaceState({}, "", "/dashboard");
+    }
+
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (code && params.get("github_callback") !== null) {
