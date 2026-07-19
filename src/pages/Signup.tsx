@@ -1,4 +1,5 @@
-import { useState } from "react";
+// path: src/pages/Signup.tsx
+import { useState, useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,15 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const { user, isLoading, signup } = useAuth();
+
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) {
+      // Redeemed later by AuthContext once the account is actually signed in
+      // (signup requires email confirmation first, so there's no session yet).
+      localStorage.setItem("pending_referral_id", ref);
+    }
+  }, []);
 
   if (!isLoading && user) return <Navigate to="/dashboard" replace />;
 
