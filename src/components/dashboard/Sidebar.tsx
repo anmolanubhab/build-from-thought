@@ -6,13 +6,14 @@ import { Project } from "@/lib/projects";
 import {
   Home, Search, BookOpen, LayoutGrid, Star, UserCircle, Users, Plug,
   FileText, ChevronDown, Sparkles, Zap, X, LogOut, Settings, UserPlus,
-  Check, Plus,
+  Check, Plus, Sun, Moon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import SettingsModal from "./SettingsModal";
+import type { WorkbenchTheme } from "@/hooks/use-workbench-theme";
 
 export type ProjectFilter = "all" | "starred" | "mine" | "shared";
 
@@ -26,6 +27,8 @@ interface SidebarProps {
   onSearchChange: (query: string) => void;
   creditsRemaining?: number;
   creditsLimit?: number;
+  theme: WorkbenchTheme;
+  onToggleTheme: () => void;
 }
 
 const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter }[] = [
@@ -37,7 +40,7 @@ const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter 
 
 export default function Sidebar({
   projects, open, onClose, activeFilter, onFilterChange, searchQuery, onSearchChange,
-  creditsRemaining, creditsLimit,
+  creditsRemaining, creditsLimit, theme, onToggleTheme,
 }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -104,11 +107,11 @@ export default function Sidebar({
         style={{ background: "var(--wb-canvas)", borderColor: "var(--wb-line)" }}
       >
         {/* Top: Workspace Dropdown */}
-        <div className="p-3 border-b relative" style={wbLine}>
+        <div className="p-3 border-b relative flex items-center gap-1.5" style={wbLine}>
           <Popover open={wsOpen} onOpenChange={setWsOpen}>
             <PopoverTrigger asChild>
               <button
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:brightness-125"
+                className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:brightness-125 min-w-0"
                 style={wbSurface}
               >
                 <div className="h-6 w-6 rounded-md flex items-center justify-center" style={{ background: "var(--wb-ember)" }}>
@@ -213,6 +216,14 @@ export default function Sidebar({
           </Popover>
           <button onClick={onClose} className="absolute top-3 right-3 lg:hidden" style={{ color: "var(--wb-text-muted)" }}>
             <X className="h-5 w-5" />
+          </button>
+          <button
+            onClick={onToggleTheme}
+            className="hidden lg:flex flex-shrink-0 p-1.5 rounded-md transition-colors hover:brightness-125"
+            style={{ background: "var(--wb-surface-raised)", color: "var(--wb-text-muted)" }}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
         </div>
 
