@@ -1,3 +1,4 @@
+// path: src/components/dashboard/ProjectsSection.tsx
 import { useState } from "react";
 import { Project } from "@/lib/projects";
 import ProjectCard from "./ProjectCard";
@@ -8,15 +9,16 @@ interface ProjectsSectionProps {
   loading: boolean;
   onOpen: (p: Project) => void;
   onDelete: (id: string) => void;
+  onStarChange?: (p: Project) => void;
 }
 
 const tabs = ["My projects", "Recently viewed", "Starred", "Templates"];
 
-export default function ProjectsSection({ projects, loading, onOpen, onDelete }: ProjectsSectionProps) {
+export default function ProjectsSection({ projects, loading, onOpen, onDelete, onStarChange }: ProjectsSectionProps) {
   const [activeTab, setActiveTab] = useState("My projects");
 
   const filteredProjects = activeTab === "Starred"
-    ? projects.filter((p) => p.is_public)
+    ? projects.filter((p) => p.is_starred)
     : projects;
 
   return (
@@ -67,6 +69,7 @@ export default function ProjectsSection({ projects, loading, onOpen, onDelete }:
                 project={project}
                 onOpen={onOpen}
                 onDelete={onDelete}
+                onStarChange={onStarChange}
               />
             ))}
           </div>
