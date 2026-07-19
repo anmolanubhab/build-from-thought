@@ -1,3 +1,4 @@
+// path: src/services/db.ts
 import { supabase } from "@/integrations/supabase/client";
 import type { Project, ProjectType, PageData } from "@/lib/projects";
 
@@ -34,7 +35,7 @@ export async function insertProject(project: {
   return data as unknown as Project;
 }
 
-export async function updateProject(id: string, updates: Partial<Pick<Project, "deployed_url" | "is_public" | "title">> & { pages?: PageData[] | null; is_multipage?: boolean }): Promise<Project> {
+export async function updateProject(id: string, updates: Partial<Pick<Project, "deployed_url" | "is_public" | "is_starred" | "title">> & { pages?: PageData[] | null; is_multipage?: boolean }): Promise<Project> {
   const { data, error } = await supabase
     .from("projects")
     .update(updates as any)
@@ -44,6 +45,27 @@ export async function updateProject(id: string, updates: Partial<Pick<Project, "
 
   if (error) throw new Error(error.message);
   return data as unknown as Project;
+}
+
+export async function toggleStar(id: string, is_starred: boolean): Promise<Project> {
+  return updateProject(id, { is_starred });
+}
+
+export interface ProfileCredits {
+  credits_remaining: number;
+  credits_daily_limit: number;
+  credits_reset_at: string;
+}
+
+export async function fetchProfileCredits(userId: string): Promise<ProfileCredits> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("credits_remaining, credits_daily_limit, credits_reset_at")
+    .eq("id", userId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as unknown as ProfileCredits;
 }
 
 export async function deleteProject(id: string): Promise<void> {
