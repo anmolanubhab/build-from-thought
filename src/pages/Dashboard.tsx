@@ -9,6 +9,7 @@ import { Menu } from "lucide-react";
 import { Project, generateSlug } from "@/lib/projects";
 import { generateApp } from "@/services/ai";
 import { fetchUserProjects, insertProject, deleteProject as dbDeleteProject, fetchProfileCredits } from "@/services/db";
+import { createBaselineVersion } from "@/services/versions";
 import Sidebar, { ProjectFilter } from "@/components/dashboard/Sidebar";
 import { useWorkbenchTheme } from "@/hooks/use-workbench-theme";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -119,6 +120,12 @@ const Dashboard = () => {
       if (typeof result.credits_remaining === "number") {
         setCreditsRemaining(result.credits_remaining);
       }
+      createBaselineVersion(newProject.id, {
+        html: newProject.html || "",
+        css: newProject.css || "",
+        react_code: newProject.react_code || "",
+        pages: newProject.pages,
+      }).catch((err) => console.error("Failed to create baseline version:", err));
       toast({ title: "App generated!", description: `"${newProject.title}" is ready.` });
     } catch (err) {
       console.error("Generation failed:", err);
