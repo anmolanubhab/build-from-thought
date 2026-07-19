@@ -57,23 +57,38 @@ export type Database = {
         Row: {
           created_at: string
           deploy_url: string | null
+          env_var_keys: string[] | null
+          error_message: string | null
+          external_id: string | null
           id: string
           project_id: string
+          provider: string
           status: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
           deploy_url?: string | null
+          env_var_keys?: string[] | null
+          error_message?: string | null
+          external_id?: string | null
           id?: string
           project_id: string
+          provider?: string
           status?: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
           deploy_url?: string | null
+          env_var_keys?: string[] | null
+          error_message?: string | null
+          external_id?: string | null
           id?: string
           project_id?: string
+          provider?: string
           status?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -264,6 +279,36 @@ export type Database = {
         }
         Relationships: []
       }
+      vercel_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          team_id: string | null
+          team_name: string | null
+          updated_at: string
+          user_id: string
+          vercel_username: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          team_id?: string | null
+          team_name?: string | null
+          updated_at?: string
+          user_id: string
+          vercel_username?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          team_id?: string | null
+          team_name?: string | null
+          updated_at?: string
+          user_id?: string
+          vercel_username?: string | null
+        }
+        Relationships: []
+      }
       supabase_connections: {
         Row: {
           access_token: string
@@ -332,6 +377,10 @@ export type Database = {
       get_supabase_connection_status: {
         Args: Record<PropertyKey, never>
         Returns: { connected: boolean; project_ref: string | null; project_name: string | null }[]
+      }
+      get_vercel_connection_status: {
+        Args: Record<PropertyKey, never>
+        Returns: { connected: boolean; team_name: string | null; vercel_username: string | null }[]
       }
     }
     Enums: {
