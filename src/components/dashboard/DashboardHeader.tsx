@@ -1,4 +1,5 @@
-import { Mic, Send, FileText, Files } from "lucide-react";
+// path: src/components/dashboard/DashboardHeader.tsx
+import { Send, FileText, Files } from "lucide-react";
 
 interface DashboardHeaderProps {
   userName: string;
