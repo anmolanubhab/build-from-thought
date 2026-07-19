@@ -1,3 +1,4 @@
+// path: src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -34,15 +35,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
+      if (session?.user) redeemPendingReferral();
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
+      if (session?.user) redeemPendingReferral();
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const redeemPendingReferral = async () => {
+    const referrerId = localStorage.getItem("pending_referral_id");
+    if (!referrerId) return;
+    localStorage.removeItem("pending_referral_id");
+    try {
+      await supabase.rpc("record_referral", { p_referrer_id: referrerId });
+    } catch {
+      // Best-effort: a failed/duplicate redemption isn't user-facing.
+    }
+  };
 
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
