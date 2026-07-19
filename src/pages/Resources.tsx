@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { getGitHubStatus } from "@/services/github";
 import { ConnectGitHubButton } from "@/components/dashboard/GitHubButton";
 import { useWorkbenchTheme } from "@/hooks/use-workbench-theme";
+import { getSupabaseConnectionStatus, disconnectSupabase, type SupabaseConnectionStatus } from "@/services/userSupabase";
+import ConnectSupabaseDialog from "@/components/dashboard/ConnectSupabaseDialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
 interface Template {
   id: string;
@@ -81,6 +85,26 @@ export default function Resources() {
   const [ghConnected, setGhConnected] = useState(false);
   const [ghUsername, setGhUsername] = useState<string>();
   const { theme, toggleTheme } = useWorkbenchTheme();
+  const [sbStatus, setSbStatus] = useState<SupabaseConnectionStatus | null>(null);
+  const [sbDialogOpen, setSbDialogOpen] = useState(false);
+
+  const refreshSupabaseStatus = () => {
+    getSupabaseConnectionStatus().then(setSbStatus).catch((err) => console.error("Failed to load Supabase connection status:", err));
+  };
+
+  const handleDisconnectSupabase = async () => {
+    try {
+      await disconnectSupabase();
+      refreshSupabaseStatus();
+      toast({ title: "Supabase disconnected" });
+    } catch (err) {
+      toast({
+        title: "Couldn't disconnect",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const refreshGitHub = () => {
     getGitHubStatus().then(({ connected, username }) => {
@@ -91,6 +115,7 @@ export default function Resources() {
 
   useEffect(() => {
     refreshGitHub();
+    refreshSupabaseStatus();
   }, []);
 
   const switchTab = (next: Tab) => {
@@ -208,7 +233,7 @@ export default function Resources() {
                   </div>
                 </div>
 
-                {/* Supabase - platform-level, always on */}
+                {/* Your own Supabase - user-managed connector (Personal Access Token for now) */}
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-10 w-10 rounded-lg bg-emerald-600 flex items-center justify-center flex-shrink-0">
@@ -216,12 +241,41 @@ export default function Resources() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-[var(--wb-text)]">Supabase</h3>
+                        <h3 className="text-sm font-semibold text-[var(--wb-text)]">Your Supabase</h3>
+                        {sbStatus?.connected && (
+                          <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="h-2.5 w-2.5" /> {sbStatus.project_name || "Connected"}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">
+                        Link your own Supabase project for apps you generate. Connected via Personal Access Token for now — 1-click OAuth is coming soon.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {sbStatus?.connected ? (
+                      <Button variant="outline" size="sm" onClick={handleDisconnectSupabase}>Disconnect</Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setSbDialogOpen(true)}>Connect</Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Platform Supabase - always on, powers WebdevsAI itself */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--wb-line)] bg-[var(--wb-surface)] p-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-lg bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <Database className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-[var(--wb-text)]">Supabase (Platform)</h3>
                         <Badge variant="secondary" className="gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                           <CheckCircle2 className="h-2.5 w-2.5" /> Active
                         </Badge>
                       </div>
-                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">Powers your database, auth, and storage. Built in — nothing to connect.</p>
+                      <p className="text-xs text-[var(--wb-text-muted)] mt-0.5">Powers WebdevsAI itself — your login, projects, and credits. Built in — nothing to connect.</p>
                     </div>
                   </div>
                 </div>
@@ -245,6 +299,12 @@ export default function Resources() {
           </div>
         </main>
       </div>
+
+      <ConnectSupabaseDialog
+        open={sbDialogOpen}
+        onClose={() => setSbDialogOpen(false)}
+        onConnected={() => refreshSupabaseStatus()}
+      />
     </div>
   );
 }
