@@ -10,6 +10,7 @@ import type { ProjectFilter } from "@/components/dashboard/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { getGitHubStatus } from "@/services/github";
 import { ConnectGitHubButton } from "@/components/dashboard/GitHubButton";
+import { useWorkbenchTheme } from "@/hooks/use-workbench-theme";
 
 interface Template {
   id: string;
@@ -79,6 +80,7 @@ export default function Resources() {
   );
   const [ghConnected, setGhConnected] = useState(false);
   const [ghUsername, setGhUsername] = useState<string>();
+  const { theme, toggleTheme } = useWorkbenchTheme();
 
   const refreshGitHub = () => {
     getGitHubStatus().then(({ connected, username }) => {
@@ -108,7 +110,7 @@ export default function Resources() {
   const noop = () => {};
 
   return (
-    <div className="min-h-screen bg-[var(--wb-canvas)] flex wb-sans">
+    <div className="min-h-screen bg-[var(--wb-canvas)] flex wb-sans" data-wb-theme={theme}>
       <Sidebar
         projects={[]}
         open={sidebarOpen}
@@ -117,6 +119,8 @@ export default function Resources() {
         onFilterChange={noop}
         searchQuery=""
         onSearchChange={noop}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
