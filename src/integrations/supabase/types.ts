@@ -112,6 +112,30 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_interest: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          plan: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          plan: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          plan?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
