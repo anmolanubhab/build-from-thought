@@ -1,7 +1,11 @@
+// path: src/components/dashboard/ProjectCard.tsx
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Project } from "@/lib/projects";
+import { toggleStar } from "@/services/db";
 import { Badge } from "@/components/ui/badge";
 import { Star, Trash2, Pencil } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const typeLabels: Record<string, string> = {
   portfolio: "Portfolio",
@@ -14,6 +18,7 @@ interface Props {
   project: Project;
   onOpen: (p: Project) => void;
   onDelete?: (id: string) => void;
+  onStarChange?: (p: Project) => void;
 }
 
 function timeAgo(dateStr: string): string {
@@ -25,8 +30,27 @@ function timeAgo(dateStr: string): string {
   return `Edited ${days} day${days > 1 ? "s" : ""} ago`;
 }
 
-export default function ProjectCard({ project, onOpen, onDelete }: Props) {
+export default function ProjectCard({ project, onOpen, onDelete, onStarChange }: Props) {
   const navigate = useNavigate();
+  const [starring, setStarring] = useState(false);
+
+  const handleToggleStar = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (starring) return;
+    setStarring(true);
+    try {
+      const updated = await toggleStar(project.id, !project.is_starred);
+      onStarChange?.(updated);
+    } catch (err) {
+      toast({
+        title: "Couldn't update star",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setStarring(false);
+    }
+  };
   return (
     <div
       className="group rounded-2xl overflow-hidden border border-gray-100 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
@@ -63,11 +87,16 @@ export default function ProjectCard({ project, onOpen, onDelete }: Props) {
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          {project.is_public && (
-            <span className="p-1.5 rounded-lg bg-amber-400 text-white">
-              <Star className="h-3.5 w-3.5 fill-white" />
-            </span>
-          )}
+          <button
+            onClick={handleToggleStar}
+            disabled={starring}
+            className={`p-1.5 rounded-lg transition-colors ${
+              project.is_starred ? "bg-amber-400 text-white" : "bg-black/40 text-white hover:bg-amber-400"
+            }`}
+            title={project.is_starred ? "Unstar" : "Star"}
+          >
+            <Star className={`h-3.5 w-3.5 ${project.is_starred ? "fill-white" : ""}`} />
+          </button>
           {onDelete && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(project.id); }}
