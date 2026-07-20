@@ -1,8 +1,11 @@
 // path: src/components/dashboard/Sidebar.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Project } from "@/lib/projects";
+import type { Workspace } from "@/lib/workspaces";
+import { CURRENT_WORKSPACE_STORAGE_KEY } from "@/lib/workspaces";
+import { fetchUserWorkspaces } from "@/services/workspaces";
 import {
   Home, Search, BookOpen, LayoutGrid, Star, UserCircle, Users, Plug,
   FileText, ChevronDown, Sparkles, Zap, X, LogOut, Settings, UserPlus,
@@ -13,6 +16,9 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import SettingsModal from "./SettingsModal";
+import UpgradeDialog from "./UpgradeDialog";
+import CreateWorkspaceDialog from "./CreateWorkspaceDialog";
+import WorkspaceMembersDialog from "./WorkspaceMembersDialog";
 import type { WorkbenchTheme } from "@/hooks/use-workbench-theme";
 
 export type ProjectFilter = "all" | "starred" | "mine" | "shared";
@@ -29,6 +35,8 @@ interface SidebarProps {
   creditsLimit?: number;
   theme: WorkbenchTheme;
   onToggleTheme: () => void;
+  /** Fires once workspaces load, and again whenever the active workspace changes (switch or create). */
+  onWorkspaceChange?: (workspaceId: string) => void;
 }
 
 const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter }[] = [
@@ -40,16 +48,50 @@ const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter 
 
 export default function Sidebar({
   projects, open, onClose, activeFilter, onFilterChange, searchQuery, onSearchChange,
-  creditsRemaining, creditsLimit, theme, onToggleTheme,
+  creditsRemaining, creditsLimit, theme, onToggleTheme, onWorkspaceChange,
 }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [wsOpen, setWsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const recentProjects = projects.slice(0, 3);
+  const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId) ?? null;
 
-  const copyInviteLink = async () => {
+  useEffect(() => {
+    fetchUserWorkspaces()
+      .then((list) => {
+        setWorkspaces(list);
+        const stored = localStorage.getItem(CURRENT_WORKSPACE_STORAGE_KEY);
+        const resolved = (stored && list.some((w) => w.id === stored) ? stored : list[0]?.id) ?? null;
+        setCurrentWorkspaceId(resolved);
+        if (resolved) {
+          localStorage.setItem(CURRENT_WORKSPACE_STORAGE_KEY, resolved);
+          onWorkspaceChange?.(resolved);
+        }
+      })
+      .catch((err) => toast({ title: "Couldn't load workspaces", description: err.message, variant: "destructive" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const switchWorkspace = (id: string) => {
+    setCurrentWorkspaceId(id);
+    localStorage.setItem(CURRENT_WORKSPACE_STORAGE_KEY, id);
+    onWorkspaceChange?.(id);
+    setWsOpen(false);
+  };
+
+  const handleWorkspaceCreated = (w: Workspace) => {
+    setWorkspaces((prev) => [...prev, w]);
+    switchWorkspace(w.id);
+  };
+
+  const shareReferralLink = async () => {
     const link = `${window.location.origin}/signup?ref=${user?.id ?? ""}`;
     try {
       await navigator.clipboard.writeText(link);
@@ -57,11 +99,6 @@ export default function Sidebar({
     } catch {
       toast({ title: "Couldn't copy link", description: link, variant: "destructive" });
     }
-    setWsOpen(false);
-  };
-
-  const createWorkspace = () => {
-    toast({ title: "Multiple workspaces", description: "This feature is coming soon." });
     setWsOpen(false);
   };
 
@@ -119,7 +156,7 @@ export default function Sidebar({
                   <Sparkles className="h-3.5 w-3.5 text-white" />
                 </div>
                 <span className="wb-display text-sm font-semibold truncate flex-1 text-left" style={{ color: "var(--wb-text)" }}>
-                  WebdevsAI Workspace
+                  {currentWorkspace?.name ?? "Loading..."}
                 </span>
                 <ChevronDown
                   className={`h-3.5 w-3.5 transition-transform ${wsOpen ? "rotate-180" : ""}`}
@@ -138,8 +175,8 @@ export default function Sidebar({
                   <Sparkles className="h-4 w-4 text-white" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: "var(--wb-text)" }}>WebdevsAI Workspace</p>
-                  <p className="wb-mono text-[11px]" style={{ color: "var(--wb-text-muted)" }}>Free Plan · 2 members</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: "var(--wb-text)" }}>{currentWorkspace?.name ?? "Workspace"}</p>
+                  <p className="wb-mono text-[11px]" style={{ color: "var(--wb-text-muted)" }}>Free Plan</p>
                 </div>
               </div>
 
@@ -153,8 +190,9 @@ export default function Sidebar({
                   <Settings className="h-3.5 w-3.5" /> Settings
                 </button>
                 <button
-                  onClick={copyInviteLink}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors hover:brightness-125"
+                  onClick={() => { setWsOpen(false); setMembersOpen(true); }}
+                  disabled={!currentWorkspace}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors hover:brightness-125 disabled:opacity-50"
                   style={{ ...wbLine, color: "var(--wb-text)" }}
                 >
                   <UserPlus className="h-3.5 w-3.5" /> Invite
@@ -165,6 +203,7 @@ export default function Sidebar({
               <div className="mx-3 mb-2 flex items-center justify-between px-3 py-2 rounded-md" style={{ background: "var(--wb-surface-raised)" }}>
                 <span className="text-xs font-semibold" style={{ color: "var(--wb-text)" }}>Turn Pro</span>
                 <button
+                  onClick={() => { setWsOpen(false); setUpgradeOpen(true); }}
                   className="px-3 py-1 rounded-md text-white text-xs font-medium transition-opacity hover:opacity-90"
                   style={{ background: "var(--wb-ember)" }}
                 >
@@ -193,20 +232,31 @@ export default function Sidebar({
               {/* All Workspaces */}
               <div className="px-3 pt-2 pb-1">
                 <p className="wb-mono text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--wb-text-muted)" }}>All workspaces</p>
-                <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md" style={{ background: "var(--wb-surface-raised)" }}>
-                  <div className="h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "var(--wb-ember)" }}>
-                    <Sparkles className="h-3 w-3 text-white" />
-                  </div>
-                  <span className="text-xs font-medium flex-1 truncate" style={{ color: "var(--wb-text)" }}>WebdevsAI Workspace</span>
-                  <span className="wb-mono text-[10px] font-medium border rounded px-1.5 py-0.5" style={{ ...wbLine, color: "var(--wb-text-muted)" }}>FREE</span>
-                  <Check className="h-3.5 w-3.5" style={{ color: "var(--wb-circuit)" }} />
+                <div className="space-y-0.5 max-h-40 overflow-auto">
+                  {workspaces.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => switchWorkspace(w.id)}
+                      className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors hover:brightness-125"
+                      style={{ background: w.id === currentWorkspaceId ? "var(--wb-surface-raised)" : "transparent" }}
+                    >
+                      <div className="h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "var(--wb-ember)" }}>
+                        <Sparkles className="h-3 w-3 text-white" />
+                      </div>
+                      <span className="text-xs font-medium flex-1 truncate text-left" style={{ color: "var(--wb-text)" }}>{w.name}</span>
+                      <span className="wb-mono text-[10px] font-medium border rounded px-1.5 py-0.5" style={{ ...wbLine, color: "var(--wb-text-muted)" }}>
+                        {w.plan.toUpperCase()}
+                      </span>
+                      {w.id === currentWorkspaceId && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "var(--wb-circuit)" }} />}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Create new */}
               <div className="px-3 pb-3 pt-1">
                 <button
-                  onClick={createWorkspace}
+                  onClick={() => { setWsOpen(false); setCreateWorkspaceOpen(true); }}
                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors border border-dashed hover:brightness-125"
                   style={{ ...wbLine, color: "var(--wb-text-muted)" }}
                 >
@@ -310,7 +360,7 @@ export default function Sidebar({
         {/* Bottom Cards */}
         <div className="p-2 space-y-1.5 border-t" style={wbLine}>
           <div
-            onClick={copyInviteLink}
+            onClick={shareReferralLink}
             className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125"
             style={wbSurface}
           >
@@ -323,7 +373,11 @@ export default function Sidebar({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125" style={wbSurface}>
+          <div
+            onClick={() => setUpgradeOpen(true)}
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125"
+            style={wbSurface}
+          >
             <div className="h-7 w-7 rounded-md flex items-center justify-center" style={{ background: "var(--wb-surface-raised)" }}>
               <Zap className="h-3.5 w-3.5" style={{ color: "var(--wb-ember)" }} />
             </div>
@@ -354,6 +408,18 @@ export default function Sidebar({
         </div>
       </aside>
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      <CreateWorkspaceDialog
+        open={createWorkspaceOpen}
+        onClose={() => setCreateWorkspaceOpen(false)}
+        onCreated={handleWorkspaceCreated}
+      />
+      <WorkspaceMembersDialog
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        workspace={currentWorkspace}
+        currentUserId={user?.id}
+      />
     </>
   );
 }

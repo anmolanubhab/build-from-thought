@@ -1,12 +1,13 @@
 // path: src/services/db.ts
 import { supabase } from "@/integrations/supabase/client";
 import type { Project, ProjectType, PageData } from "@/lib/projects";
+import { resolveDefaultWorkspaceId } from "@/services/workspaces";
 
-export async function fetchUserProjects(userId: string): Promise<Project[]> {
+export async function fetchWorkspaceProjects(workspaceId: string): Promise<Project[]> {
   const { data, error } = await supabase
     .from("projects")
     .select("*")
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -15,6 +16,7 @@ export async function fetchUserProjects(userId: string): Promise<Project[]> {
 
 export async function insertProject(project: {
   user_id: string;
+  workspace_id: string;
   title: string;
   type: ProjectType;
   prompt: string;
@@ -110,8 +112,10 @@ export async function incrementViewCount(id: string): Promise<void> {
 }
 
 export async function remixProject(originalProject: Project, newUserId: string, newSlug: string): Promise<Project> {
+  const workspaceId = await resolveDefaultWorkspaceId();
   return insertProject({
     user_id: newUserId,
+    workspace_id: workspaceId,
     title: `${originalProject.title} (Remix)`,
     type: originalProject.type,
     prompt: originalProject.prompt,

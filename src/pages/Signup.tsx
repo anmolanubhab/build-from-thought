@@ -17,11 +17,16 @@ const Signup = () => {
   const { user, isLoading, signup } = useAuth();
 
   useEffect(() => {
-    const ref = new URLSearchParams(window.location.search).get("ref");
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
     if (ref) {
       // Redeemed later by AuthContext once the account is actually signed in
       // (signup requires email confirmation first, so there's no session yet).
       localStorage.setItem("pending_referral_id", ref);
+    }
+    const workspaceCode = params.get("workspace");
+    if (workspaceCode) {
+      localStorage.setItem("pending_workspace_invite", workspaceCode);
     }
   }, []);
 

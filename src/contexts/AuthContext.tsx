@@ -35,13 +35,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
-      if (session?.user) redeemPendingReferral();
+      if (session?.user) {
+        redeemPendingReferral();
+        redeemPendingWorkspaceInvite();
+      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
-      if (session?.user) redeemPendingReferral();
+      if (session?.user) {
+        redeemPendingReferral();
+        redeemPendingWorkspaceInvite();
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -55,6 +61,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await supabase.rpc("record_referral", { p_referrer_id: referrerId });
     } catch {
       // Best-effort: a failed/duplicate redemption isn't user-facing.
+    }
+  };
+
+  const redeemPendingWorkspaceInvite = async () => {
+    const code = localStorage.getItem("pending_workspace_invite");
+    if (!code) return;
+    localStorage.removeItem("pending_workspace_invite");
+    try {
+      await supabase.rpc("join_workspace_by_code", { p_code: code });
+    } catch {
+      // Best-effort: an invalid/duplicate invite code isn't user-facing here —
+      // JoinWorkspace.tsx handles the direct-link (already-logged-in) case explicitly.
     }
   };
 

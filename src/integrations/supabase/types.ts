@@ -11,7 +11,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -136,6 +136,38 @@ export type Database = {
         }
         Relationships: []
       }
+      netlify_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          netlify_email: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          netlify_email?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          netlify_email?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "netlify_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_interest: {
         Row: {
           created_at: string
@@ -237,6 +269,35 @@ export type Database = {
           },
         ]
       }
+      project_netlify_sites: {
+        Row: {
+          created_at: string
+          project_id: string
+          site_id: string
+          site_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          project_id: string
+          site_id: string
+          site_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          project_id?: string
+          site_id?: string
+          site_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_netlify_sites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_versions: {
         Row: {
           code: string | null
@@ -312,6 +373,7 @@ export type Database = {
           updated_at: string
           user_id: string
           view_count: number
+          workspace_id: string
         }
         Insert: {
           created_at?: string
@@ -331,6 +393,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           view_count?: number
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -350,58 +413,117 @@ export type Database = {
           updated_at?: string
           user_id?: string
           view_count?: number
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      netlify_connections: {
+      referrals: {
+        Row: {
+          created_at: string
+          credits_awarded: number
+          id: string
+          referred_id: string
+          referrer_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_awarded?: number
+          id?: string
+          referred_id: string
+          referrer_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_awarded?: number
+          id?: string
+          referred_id?: string
+          referrer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_referred_id_fkey"
+            columns: ["referred_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shared_projects: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supabase_connections: {
         Row: {
           access_token: string
           created_at: string
-          netlify_email: string | null
+          project_name: string | null
+          project_ref: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           access_token: string
           created_at?: string
-          netlify_email?: string | null
+          project_name?: string | null
+          project_ref?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           access_token?: string
           created_at?: string
-          netlify_email?: string | null
+          project_name?: string | null
+          project_ref?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
-      }
-      project_netlify_sites: {
-        Row: {
-          created_at: string
-          project_id: string
-          site_id: string
-          site_url: string | null
-        }
-        Insert: {
-          created_at?: string
-          project_id: string
-          site_id: string
-          site_url?: string | null
-        }
-        Update: {
-          created_at?: string
-          project_id?: string
-          site_id?: string
-          site_url?: string | null
-        }
         Relationships: [
           {
-            foreignKeyName: "project_netlify_sites_project_id_fkey"
-            columns: ["project_id"]
+            foreignKeyName: "supabase_connections_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: true
-            referencedRelation: "projects"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -434,89 +556,147 @@ export type Database = {
           user_id?: string
           vercel_username?: string | null
         }
-        Relationships: []
-      }
-      supabase_connections: {
-        Row: {
-          access_token: string
-          created_at: string
-          project_name: string | null
-          project_ref: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          access_token: string
-          created_at?: string
-          project_name?: string | null
-          project_ref?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          access_token?: string
-          created_at?: string
-          project_name?: string | null
-          project_ref?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      shared_projects: {
-        Row: {
-          created_at: string
-          id: string
-          project_id: string
-          slug: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          project_id: string
-          slug: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          project_id?: string
-          slug?: string
-        }
         Relationships: [
           {
-            foreignKeyName: "shared_projects_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
+            foreignKeyName: "vercel_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
+      }
+      workspace_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspaces: {
+        Row: {
+          created_at: string
+          id: string
+          invite_code: string
+          name: string
+          owner_id: string
+          plan: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invite_code?: string
+          name: string
+          owner_id: string
+          plan?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invite_code?: string
+          name?: string
+          owner_id?: string
+          plan?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      record_referral: {
-        Args: { p_referrer_id: string }
-        Returns: undefined
+      create_workspace: {
+        Args: { p_name: string }
+        Returns: {
+          created_at: string
+          id: string
+          invite_code: string
+          name: string
+          owner_id: string
+          plan: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspaces"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      get_netlify_connection_status: {
+        Args: never
+        Returns: {
+          connected: boolean
+          netlify_email: string
+        }[]
       }
       get_supabase_connection_status: {
-        Args: Record<PropertyKey, never>
-        Returns: { connected: boolean; project_ref: string | null; project_name: string | null }[]
+        Args: never
+        Returns: {
+          connected: boolean
+          project_name: string
+          project_ref: string
+        }[]
       }
       get_vercel_connection_status: {
-        Args: Record<PropertyKey, never>
-        Returns: { connected: boolean; team_name: string | null; vercel_username: string | null }[]
+        Args: never
+        Returns: {
+          connected: boolean
+          team_name: string
+          vercel_username: string
+        }[]
+      }
+      join_workspace_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          created_at: string
+          id: string
+          invite_code: string
+          name: string
+          owner_id: string
+          plan: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspaces"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       publish_project_version: {
         Args: { p_version_id: string }
         Returns: undefined
       }
-      get_netlify_connection_status: {
-        Args: Record<PropertyKey, never>
-        Returns: { connected: boolean; netlify_email: string | null }[]
-      }
+      record_referral: { Args: { p_referrer_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

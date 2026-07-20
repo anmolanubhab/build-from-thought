@@ -8,7 +8,7 @@ import {
 import { Menu } from "lucide-react";
 import { Project, generateSlug } from "@/lib/projects";
 import { generateApp } from "@/services/ai";
-import { fetchUserProjects, insertProject, deleteProject as dbDeleteProject, fetchProfileCredits } from "@/services/db";
+import { fetchWorkspaceProjects, insertProject, deleteProject as dbDeleteProject, fetchProfileCredits } from "@/services/db";
 import { createBaselineVersion } from "@/services/versions";
 import Sidebar, { ProjectFilter } from "@/components/dashboard/Sidebar";
 import { useWorkbenchTheme } from "@/hooks/use-workbench-theme";
@@ -36,23 +36,26 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [creditsRemaining, setCreditsRemaining] = useState<number>();
   const [creditsLimit, setCreditsLimit] = useState<number>();
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
 
-  // "Created by me" is equivalent to "All projects" today since this app has
-  // no team/multi-owner model yet. "Shared with me" has no data source yet
-  // (no collaboration feature) so it correctly shows an empty state.
+  // With workspaces, every project in the list is already implicitly "shared"
+  // with the whole workspace — "Created by me" / "Shared with me" now split
+  // on who actually created each project rather than being no-ops.
   const visibleProjects = useMemo(() => {
     let list = projects;
     if (sidebarFilter === "starred") {
       list = list.filter((p) => p.is_starred);
+    } else if (sidebarFilter === "mine") {
+      list = list.filter((p) => p.user_id === user?.id);
     } else if (sidebarFilter === "shared") {
-      list = [];
+      list = list.filter((p) => p.user_id !== user?.id);
     }
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       list = list.filter((p) => p.title.toLowerCase().includes(q));
     }
     return list;
-  }, [projects, sidebarFilter, searchQuery]);
+  }, [projects, sidebarFilter, searchQuery, user?.id]);
 
   const refreshGitHub = () => {
     getGitHubStatus().then(({ connected, username }) => {
@@ -62,13 +65,16 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!currentWorkspaceId) return;
     setLoadingProjects(true);
-    fetchUserProjects(user.id)
+    fetchWorkspaceProjects(currentWorkspaceId)
       .then(setProjects)
       .catch((err) => console.error("Failed to load projects:", err))
       .finally(() => setLoadingProjects(false));
+  }, [currentWorkspaceId]);
 
+  useEffect(() => {
+    if (!user?.id) return;
     fetchProfileCredits(user.id)
       .then((c) => { setCreditsRemaining(c.credits_remaining); setCreditsLimit(c.credits_daily_limit); })
       .catch((err) => console.error("Failed to load credits:", err));
@@ -98,13 +104,14 @@ const Dashboard = () => {
   }, [user?.id]);
 
   const handleGenerate = async () => {
-    if (!prompt.trim() || generating || !user) return;
+    if (!prompt.trim() || generating || !user || !currentWorkspaceId) return;
     setGenerating(true);
     try {
       const result = await generateApp(prompt, isMultipage);
       const slug = generateSlug(result.title || prompt.slice(0, 40));
       const newProject = await insertProject({
         user_id: user.id,
+        workspace_id: currentWorkspaceId,
         title: result.title || prompt.slice(0, 60),
         type: result.type,
         prompt,
@@ -171,6 +178,7 @@ const Dashboard = () => {
         creditsLimit={creditsLimit}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onWorkspaceChange={setCurrentWorkspaceId}
       />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
@@ -202,11 +210,6 @@ const Dashboard = () => {
             onToggleMultipage={setIsMultipage}
           />
 
-          {sidebarFilter === "shared" && !loadingProjects && (
-            <p className="px-6 md:px-8 -mt-2 mb-2 text-[13px]" style={{ color: "var(--wb-text-muted)" }}>
-              Team sharing isn't set up yet — projects others share with you will show up here.
-            </p>
-          )}
           <ProjectsSection
             projects={visibleProjects}
             loading={loadingProjects}
