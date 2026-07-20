@@ -12,6 +12,7 @@ import Signup from "./pages/Signup.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
+import DashboardSettings from "./pages/DashboardSettings.tsx";
 import Resources from "./pages/Resources.tsx";
 import SharePage from "./pages/SharePage.tsx";
 import JoinWorkspace from "./pages/JoinWorkspace.tsx";
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/settings" element={<ProtectedRoute><DashboardSettings /></ProtectedRoute>} />
             <Route path="/dashboard/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
             <Route path="/share/:slug" element={<SharePage />} />
             <Route path="/join/:code" element={<JoinWorkspace />} />

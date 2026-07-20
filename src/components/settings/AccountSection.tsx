@@ -1,21 +1,14 @@
-// path: src/components/dashboard/SettingsModal.tsx
-import { useState, useEffect } from "react";
+// path: src/components/settings/AccountSection.tsx
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import SettingsCard from "./SettingsCard";
 
-interface Props {
-  open: boolean;
-  onClose: () => void;
-}
-
-export default function SettingsModal({ open, onClose }: Props) {
+export default function AccountSection() {
   const { user } = useAuth();
   const [name, setName] = useState(user?.name || "");
   const [newPassword, setNewPassword] = useState("");
@@ -23,19 +16,14 @@ export default function SettingsModal({ open, onClose }: Props) {
   const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setName(user?.name || "");
-      setNewPassword("");
-    }
-  }, [open, user?.name]);
+    setName(user?.name || "");
+  }, [user?.name]);
 
   const saveName = async () => {
     if (!user || !name.trim() || name.trim() === user.name) return;
     setSavingName(true);
     try {
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { name: name.trim() },
-      });
+      const { error: authError } = await supabase.auth.updateUser({ data: { name: name.trim() } });
       if (authError) throw authError;
 
       const { error: profileError } = await supabase
@@ -79,61 +67,58 @@ export default function SettingsModal({ open, onClose }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-[var(--wb-surface)] border-[var(--wb-line)] sm:max-w-md wb-sans">
-        <DialogHeader>
-          <DialogTitle className="text-[var(--wb-text)]">Settings</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-5 py-2">
+    <div className="space-y-5">
+      <SettingsCard>
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Profile</h3>
+        <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="settings-email" className="text-[var(--wb-text-muted)]">Email</Label>
-            <Input id="settings-email" value={user?.email || ""} disabled className="bg-[var(--wb-surface-raised)] border-[var(--wb-line)] text-[var(--wb-text-muted)]" />
+            <Label htmlFor="account-email" className="text-gray-600">Email</Label>
+            <Input id="account-email" value={user?.email || ""} disabled className="bg-gray-50 border-gray-200 text-gray-500" />
           </div>
-
           <div className="space-y-1.5">
-            <Label htmlFor="settings-name" className="text-[var(--wb-text-muted)]">Display name</Label>
+            <Label htmlFor="account-name" className="text-gray-600">Full name</Label>
             <div className="flex gap-2">
               <Input
-                id="settings-name"
+                id="account-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className="bg-white border-gray-200 text-gray-900 focus-visible:ring-blue-500/30"
               />
               <Button
                 onClick={saveName}
                 disabled={savingName || !name.trim() || name.trim() === user?.name}
-                size="sm"
+                className="bg-blue-600 text-white hover:bg-blue-700"
               >
                 {savingName ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>
+        </div>
+      </SettingsCard>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="settings-password" className="text-[var(--wb-text-muted)]">New password</Label>
-            <div className="flex gap-2">
-              <Input
-                id="settings-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Leave blank to keep current password"
-              />
-              <Button
-                onClick={savePassword}
-                disabled={savingPassword || !newPassword}
-                size="sm"
-              >
-                {savingPassword ? "Saving..." : "Update"}
-              </Button>
-            </div>
+      <SettingsCard>
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Password</h3>
+        <div className="space-y-1.5">
+          <Label htmlFor="account-password" className="text-gray-600">New password</Label>
+          <div className="flex gap-2">
+            <Input
+              id="account-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Leave blank to keep current password"
+              className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus-visible:ring-blue-500/30"
+            />
+            <Button
+              onClick={savePassword}
+              disabled={savingPassword || !newPassword}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {savingPassword ? "Saving..." : "Update"}
+            </Button>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </SettingsCard>
+    </div>
   );
 }

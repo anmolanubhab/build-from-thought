@@ -15,7 +15,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import SettingsModal from "./SettingsModal";
 import UpgradeDialog from "./UpgradeDialog";
 import CreateWorkspaceDialog from "./CreateWorkspaceDialog";
 import WorkspaceMembersDialog from "./WorkspaceMembersDialog";
@@ -54,7 +53,6 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [wsOpen, setWsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -183,7 +181,7 @@ export default function Sidebar({
               {/* Action Buttons */}
               <div className="px-3 pb-2 flex gap-2">
                 <button
-                  onClick={() => { setWsOpen(false); setSettingsOpen(true); }}
+                  onClick={() => { setWsOpen(false); navigate("/dashboard/settings"); }}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors hover:brightness-125"
                   style={{ ...wbLine, color: "var(--wb-text)" }}
                 >
@@ -407,7 +405,6 @@ export default function Sidebar({
           </div>
         </div>
       </aside>
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
       <CreateWorkspaceDialog
         open={createWorkspaceOpen}

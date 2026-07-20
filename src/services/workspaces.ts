@@ -59,6 +59,19 @@ export async function removeWorkspaceMember(workspaceId: string, userId: string)
   if (error) throw new Error(error.message);
 }
 
+/** RLS restricts this to the workspace's owner. */
+export async function updateWorkspaceName(workspaceId: string, name: string): Promise<Workspace> {
+  const { data, error } = await supabase
+    .from("workspaces")
+    .update({ name } as any)
+    .eq("id", workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as unknown as Workspace;
+}
+
 /**
  * Resolves which workspace a client-side action should use when there's no
  * explicit "current workspace" already in scope (e.g. remixing a shared
