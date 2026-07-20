@@ -76,28 +76,28 @@ export default function DeployToNetlifyDialog({ open, onClose, project }: Props)
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-white border-gray-200">
         <DialogHeader>
-          <DialogTitle>Deploy "{project.title}" to Netlify</DialogTitle>
+          <DialogTitle className="text-gray-900">Deploy "{project.title}" to Netlify</DialogTitle>
         </DialogHeader>
 
         {phase === "idle" && (
-          <p className="text-sm text-muted-foreground py-4">This creates (or updates) a Netlify site for this project and deploys the current live version.</p>
+          <p className="text-sm text-gray-500 py-4">This creates (or updates) a Netlify site for this project and deploys the current live version.</p>
         )}
 
         {phase === "building" && (
           <div className="py-10 text-center space-y-3">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-teal-500" />
-            <p className="text-sm font-medium">Deploying to Netlify...</p>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
+            <p className="text-sm font-medium text-gray-900">Deploying to Netlify...</p>
           </div>
         )}
 
         {phase === "success" && (
           <div className="py-8 text-center space-y-3">
             <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-            <p className="font-semibold">Deployed successfully!</p>
+            <p className="font-semibold text-gray-900">Deployed successfully!</p>
             {deployUrl && (
-              <a href={deployUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-teal-600 hover:underline">
+              <a href={deployUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
                 {deployUrl} <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}
@@ -110,14 +110,14 @@ export default function DeployToNetlifyDialog({ open, onClose, project }: Props)
               <XCircle className="h-5 w-5" />
               <p className="font-semibold text-sm">Deployment failed</p>
             </div>
-            {errorMessage && <p className="text-sm bg-red-500/10 border border-red-500/30 rounded-md p-2.5 font-mono">{errorMessage}</p>}
+            {errorMessage && <p className="text-sm bg-red-50 border border-red-200 text-red-700 rounded-md p-2.5 font-mono">{errorMessage}</p>}
           </div>
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>{phase === "success" || phase === "failed" ? "Close" : "Cancel"}</Button>
-          {phase === "idle" && <Button onClick={handleDeploy}>Deploy</Button>}
-          {phase === "failed" && <Button onClick={handleDeploy}>Try Again</Button>}
+          <Button variant="outline" onClick={onClose} className="border-gray-200 text-gray-600 hover:bg-gray-50">{phase === "success" || phase === "failed" ? "Close" : "Cancel"}</Button>
+          {phase === "idle" && <Button onClick={handleDeploy} className="bg-blue-600 text-white hover:bg-blue-700">Deploy</Button>}
+          {phase === "failed" && <Button onClick={handleDeploy} className="bg-blue-600 text-white hover:bg-blue-700">Try Again</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -4,13 +4,21 @@ import { Project, getProjectPages } from "@/lib/projects";
 import { downloadProject } from "@/services/export";
 import { deployProject, DeployStatus } from "@/services/deploy";
 import { updateProject } from "@/services/db";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Eye, Code, Download, Rocket, Copy, ExternalLink, Share2, CheckCircle, XCircle, Files } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Eye, Code, Download, Rocket, Copy, ExternalLink, Share2, CheckCircle, XCircle, Files,
+  ChevronDown, Globe, Monitor, Tablet, Smartphone, Loader2, Lock,
+} from "lucide-react";
 import { PushToGitHubButton } from "@/components/dashboard/GitHubButton";
 import DeployToVercelDialog from "@/components/dashboard/DeployToVercelDialog";
 import DomainManagerDialog from "@/components/dashboard/DomainManagerDialog";
@@ -25,6 +33,14 @@ const typeLabels: Record<string, string> = {
   generic: "Web App",
 };
 
+type Device = "desktop" | "tablet" | "mobile";
+
+const devices: { id: Device; icon: typeof Monitor; width: string; label: string }[] = [
+  { id: "desktop", icon: Monitor, width: "100%", label: "Desktop" },
+  { id: "tablet", icon: Tablet, width: "768px", label: "Tablet" },
+  { id: "mobile", icon: Smartphone, width: "390px", label: "Mobile" },
+];
+
 interface Props {
   project: Project | null;
   onClose: () => void;
@@ -33,6 +49,8 @@ interface Props {
 }
 
 export default function ProjectModal({ project, onClose, onUpdate, ghConnected }: Props) {
+  const [tab, setTab] = useState<"preview" | "code">("preview");
+  const [device, setDevice] = useState<Device>("desktop");
   const [codeTab, setCodeTab] = useState<"html" | "react">("html");
   const [downloading, setDownloading] = useState(false);
   const [deployStatus, setDeployStatus] = useState<DeployStatus>("idle");
@@ -92,6 +110,12 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
     toast({ title: "Share link copied!" });
   };
 
+  const copyDeployUrl = () => {
+    if (!currentDeployUrl) return;
+    navigator.clipboard.writeText(currentDeployUrl);
+    toast({ title: "URL copied!" });
+  };
+
   const previewHtml = `<!DOCTYPE html>
 <html><head><style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -102,127 +126,220 @@ export default function ProjectModal({ project, onClose, onUpdate, ghConnected }
   return (
     <>
     <Dialog open={!!project} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-4xl glass border-border/50 bg-card/95 max-h-[90vh] overflow-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <DialogTitle className="text-foreground truncate">{project.title}</DialogTitle>
-            <Badge variant="secondary" className="text-[10px]">{typeLabels[project.type]}</Badge>
+      <DialogContent className="w-[92vw] max-w-[1400px] h-[88vh] max-h-[88vh] p-0 gap-0 flex flex-col bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 px-5 py-2 pr-12 border-b border-gray-200 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <DialogTitle className="text-gray-900 font-semibold truncate text-base">{project.title}</DialogTitle>
+            <Badge variant="outline" className="text-[10px] shrink-0 border-gray-200 text-gray-500 bg-gray-50">
+              {typeLabels[project.type]}
+            </Badge>
             {isMultipage && (
-              <Badge variant="outline" className="text-[10px] gap-1">
+              <Badge variant="outline" className="text-[10px] shrink-0 gap-1 border-gray-200 text-gray-500 bg-gray-50">
                 <Files className="h-2.5 w-2.5" /> {pages.length} pages
               </Badge>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">{new Date(project.created_at).toLocaleDateString()}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <Switch id="public-toggle" checked={project.is_public} onCheckedChange={handleTogglePublic} />
-                <Label htmlFor="public-toggle" className="text-xs text-muted-foreground">
-                  {project.is_public ? "Public" : "Private"}
-                </Label>
-              </div>
 
-              {project.is_public && (
-                <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50" onClick={copyShareLink}>
-                  <Share2 className="h-3 w-3" /> Share
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 pr-2 mr-1 border-r border-gray-200">
+              <Switch
+                id="public-toggle"
+                checked={project.is_public}
+                onCheckedChange={handleTogglePublic}
+                className="data-[state=checked]:bg-blue-600"
+              />
+              <label htmlFor="public-toggle" className="text-xs text-gray-500 select-none cursor-pointer">
+                {project.is_public ? "Public" : "Private"}
+              </label>
+            </div>
+
+            {project.is_public && (
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs border-gray-200 text-gray-600 hover:bg-gray-50" onClick={copyShareLink}>
+                <Share2 className="h-3.5 w-3.5" /> Share
+              </Button>
+            )}
+
+            {ghConnected && <PushToGitHubButton project={project} connected={ghConnected} />}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                  disabled={deployStatus === "deploying"}
+                >
+                  {deployStatus === "deploying" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Rocket className="h-3.5 w-3.5" />
+                  )}
+                  Deploy
+                  <ChevronDown className="h-3 w-3 opacity-80" />
                 </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white border-gray-200 text-gray-700 w-56">
+                <DropdownMenuItem onClick={handleDeploy} className="gap-2 text-xs focus:bg-gray-50 cursor-pointer">
+                  {deployStatus === "success" ? (
+                    <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : deployStatus === "error" ? (
+                    <XCircle className="h-3.5 w-3.5 text-red-500" />
+                  ) : (
+                    <Rocket className="h-3.5 w-3.5 text-gray-400" />
+                  )}
+                  Quick Deploy
+                  <span className="ml-auto text-[10px] text-gray-400">Instant</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setVercelDialogOpen(true)} className="gap-2 text-xs focus:bg-gray-50 cursor-pointer">
+                  <Rocket className="h-3.5 w-3.5 text-gray-400" /> Deploy to Vercel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setNetlifyDialogOpen(true)} className="gap-2 text-xs focus:bg-gray-50 cursor-pointer">
+                  <Rocket className="h-3.5 w-3.5 text-gray-400" /> Deploy to Netlify
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-gray-100" />
+                <DropdownMenuItem onClick={handleDownload} disabled={downloading} className="gap-2 text-xs focus:bg-gray-50 cursor-pointer">
+                  <Download className="h-3.5 w-3.5 text-gray-400" /> {downloading ? "Zipping…" : "Download ZIP"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDomainsDialogOpen(true)} className="gap-2 text-xs focus:bg-gray-50 cursor-pointer">
+                  <Globe className="h-3.5 w-3.5 text-gray-400" /> Manage Domains
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Compact deploy URL bar */}
+        {currentDeployUrl && (
+          <div className="flex items-center gap-2 px-5 py-1 border-b border-gray-100 bg-blue-50/40 shrink-0">
+            <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+            <span className="flex-1 min-w-0 truncate text-xs font-mono text-gray-600" title={currentDeployUrl}>
+              {currentDeployUrl}
+            </span>
+            <button
+              onClick={copyDeployUrl}
+              className="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-white transition-colors shrink-0"
+              aria-label="Copy URL"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+            <a
+              href={currentDeployUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-white transition-colors shrink-0"
+              aria-label="Open URL"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        )}
+
+        {/* Workspace */}
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "preview" | "code")} className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between gap-3 px-5 py-1 border-b border-gray-100 shrink-0">
+            <TabsList className="bg-gray-100 p-1 h-8">
+              <TabsTrigger value="preview" className="gap-1.5 text-xs text-gray-500 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm">
+                <Eye className="h-3.5 w-3.5" /> Preview
+              </TabsTrigger>
+              <TabsTrigger value="code" className="gap-1.5 text-xs text-gray-500 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm">
+                <Code className="h-3.5 w-3.5" /> Code
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="flex items-center gap-2">
+              {isMultipage && (
+                <Select value={String(currentPageIndex)} onValueChange={(v) => setActivePage(Number(v))}>
+                  <SelectTrigger className="h-8 w-40 text-xs bg-white border-gray-200 text-gray-700">
+                    <SelectValue placeholder="Page" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200 text-gray-700">
+                    {pages.map((page, idx) => (
+                      <SelectItem key={page.name} value={String(idx)} className="text-xs focus:bg-gray-50">
+                        {page.title || page.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
 
-              <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50 hover:border-primary" onClick={handleDownload} disabled={downloading}>
-                <Download className="h-3 w-3" /> {downloading ? "..." : "ZIP"}
-              </Button>
-
-              <Button size="sm" className="gap-1 text-xs gradient-bg text-primary-foreground" onClick={handleDeploy} disabled={deployStatus === "deploying"}>
-                {ghConnected && <PushToGitHubButton project={project} connected={ghConnected} />}
-                {deployStatus === "deploying" ? (
-                  <><span className="w-3 h-3 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" /> Deploying...</>
-                ) : deployStatus === "success" ? (
-                  <><CheckCircle className="h-3 w-3" /> Live ✅</>
-                ) : deployStatus === "error" ? (
-                  <><XCircle className="h-3 w-3" /> Retry</>
-                ) : (
-                  <><Rocket className="h-3 w-3" /> Quick Deploy</>
-                )}
-              </Button>
-
-              <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50 hover:border-primary" onClick={() => setVercelDialogOpen(true)}>
-                <Rocket className="h-3 w-3" /> Deploy to Vercel
-              </Button>
-
-              <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50 hover:border-primary" onClick={() => setDomainsDialogOpen(true)}>
-                Domains
-              </Button>
-
-              <Button size="sm" variant="outline" className="gap-1 text-xs border-border/50 hover:border-primary" onClick={() => setNetlifyDialogOpen(true)}>
-                Deploy to Netlify
-              </Button>
+              {tab === "preview" && (
+                <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
+                  {devices.map(({ id, icon: Icon, label }) => (
+                    <button
+                      key={id}
+                      onClick={() => setDevice(id)}
+                      aria-label={label}
+                      title={label}
+                      className={cn(
+                        "flex items-center justify-center h-7 w-7 rounded-md transition-colors",
+                        device === id ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {currentDeployUrl && (
-            <a href={currentDeployUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1">
-              <ExternalLink className="h-3 w-3" /> {currentDeployUrl}
-            </a>
-          )}
-        </DialogHeader>
-
-        <Tabs defaultValue="preview" className="w-full">
-          <TabsList className="bg-secondary/50">
-            <TabsTrigger value="preview" className="gap-1 text-xs"><Eye className="h-3 w-3" /> Preview</TabsTrigger>
-            <TabsTrigger value="code" className="gap-1 text-xs"><Code className="h-3 w-3" /> Code</TabsTrigger>
-          </TabsList>
-
-          {/* Page switcher for multi-page */}
-          {isMultipage && (
-            <div className="flex items-center gap-1 mt-3 mb-1 overflow-x-auto">
-              {pages.map((page, idx) => (
-                <button
-                  key={page.name}
-                  onClick={() => setActivePage(idx)}
-                  className={cn(
-                    "px-3 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
-                    currentPageIndex === idx
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
-                  )}
-                >
-                  {page.title || page.name}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <TabsContent value="preview" className="mt-4">
-            <div className="bg-secondary/30 rounded-lg overflow-hidden min-h-[350px]">
-              <iframe srcDoc={previewHtml} className="w-full h-[400px] border-0 rounded-lg bg-white" sandbox="allow-same-origin" title="Project Preview" />
+          <TabsContent value="preview" className="flex-1 min-h-0 m-0 p-2 bg-gray-50/70 overflow-auto">
+            <div className="h-full flex justify-center">
+              <div
+                className="h-full max-w-full flex-shrink-0 flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden"
+                style={{ width: devices.find((d) => d.id === device)?.width }}
+              >
+                <div className="flex items-center gap-2 px-3 py-1 border-b border-gray-100 bg-gray-50 shrink-0">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-400/70" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400/70" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/70" />
+                  <div className="flex-1 mx-2 flex items-center gap-1.5 rounded-md bg-white border border-gray-200 px-2.5 py-0.5 text-[11px] text-gray-400 truncate">
+                    <Lock className="h-2.5 w-2.5 text-gray-300 shrink-0" />
+                    {currentPage?.title || "Preview"}
+                  </div>
+                </div>
+                <iframe
+                  srcDoc={previewHtml}
+                  className="flex-1 w-full border-0 bg-white"
+                  sandbox="allow-same-origin"
+                  title="Project Preview"
+                />
+              </div>
             </div>
           </TabsContent>
-          <TabsContent value="code" className="mt-4 space-y-3">
-            <div className="flex gap-2">
-              <Button size="sm" variant={codeTab === "html" ? "default" : "outline"} className="text-xs" onClick={() => setCodeTab("html")}>
-                HTML / CSS
-              </Button>
-              {!isMultipage && (
-                <Button size="sm" variant={codeTab === "react" ? "default" : "outline"} className="text-xs" onClick={() => setCodeTab("react")}>
-                  React
+
+          <TabsContent value="code" className="flex-1 min-h-0 m-0 overflow-hidden">
+            <div className="h-full flex flex-col">
+              <div className="flex items-center gap-2 px-5 py-2 border-b border-gray-100 shrink-0">
+                <Button size="sm" variant={codeTab === "html" ? "default" : "outline"} className={cn("text-xs h-7", codeTab === "html" ? "bg-blue-600 hover:bg-blue-700" : "border-gray-200 text-gray-600")} onClick={() => setCodeTab("html")}>
+                  HTML / CSS
                 </Button>
-              )}
-              <Button size="sm" variant="ghost" className="text-xs ml-auto gap-1" onClick={() => {
-                const code = codeTab === "html"
-                  ? `${currentPage?.html || ""}\n\n/* CSS */\n${project.css || ""}`
-                  : project.react_code || "";
-                navigator.clipboard.writeText(code);
-                toast({ title: "Code copied!" });
-              }}>
-                <Copy className="h-3 w-3" /> Copy
-              </Button>
+                {!isMultipage && (
+                  <Button size="sm" variant={codeTab === "react" ? "default" : "outline"} className={cn("text-xs h-7", codeTab === "react" ? "bg-blue-600 hover:bg-blue-700" : "border-gray-200 text-gray-600")} onClick={() => setCodeTab("react")}>
+                    React
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs h-7 ml-auto gap-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  onClick={() => {
+                    const code = codeTab === "html"
+                      ? `${currentPage?.html || ""}\n\n/* CSS */\n${project.css || ""}`
+                      : project.react_code || "";
+                    navigator.clipboard.writeText(code);
+                    toast({ title: "Code copied!" });
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" /> Copy
+                </Button>
+              </div>
+              <pre className="flex-1 overflow-auto m-0 px-5 py-4 text-xs text-gray-600 font-mono bg-gray-50/60">
+                {codeTab === "html"
+                  ? `<!-- HTML${isMultipage ? ` — ${currentPage?.title}` : ""} -->\n${currentPage?.html || "No HTML generated"}\n\n/* CSS */\n${project.css || "No CSS generated"}`
+                  : project.react_code || "No React code generated"}
+              </pre>
             </div>
-            <pre className="bg-secondary/30 rounded-lg p-4 text-xs text-muted-foreground overflow-auto font-mono max-h-[350px]">
-              {codeTab === "html"
-                ? `<!-- HTML${isMultipage ? ` — ${currentPage?.title}` : ""} -->\n${currentPage?.html || "No HTML generated"}\n\n/* CSS */\n${project.css || "No CSS generated"}`
-                : project.react_code || "No React code generated"}
-            </pre>
           </TabsContent>
         </Tabs>
       </DialogContent>

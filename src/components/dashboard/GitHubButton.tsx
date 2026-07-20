@@ -97,7 +97,7 @@ export function PushToGitHubButton({ project, connected }: PushButtonProps) {
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={handleOpen} className="gap-1.5 text-xs border-gray-200">
+      <Button size="sm" variant="outline" onClick={handleOpen} className="h-8 gap-1.5 text-xs border-gray-200">
         <Github className="h-3.5 w-3.5" /> Push to GitHub
       </Button>
 
@@ -119,7 +119,7 @@ export function PushToGitHubButton({ project, connected }: PushButtonProps) {
                 href={repoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-violet-600 hover:underline"
+                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
               >
                 <ExternalLink className="h-3.5 w-3.5" /> {repoUrl}
               </a>
@@ -146,7 +146,7 @@ export function PushToGitHubButton({ project, connected }: PushButtonProps) {
             {repoUrl ? (
               <Button onClick={() => setOpen(false)} className="w-full">Done</Button>
             ) : (
-              <Button onClick={handlePush} disabled={pushing || !repoName.trim()} className="w-full gap-1.5 bg-gray-900 hover:bg-gray-800">
+              <Button onClick={handlePush} disabled={pushing || !repoName.trim()} className="w-full gap-1.5 bg-blue-600 hover:bg-blue-700 text-white">
                 {pushing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />}
                 {pushing ? "Pushing..." : "Create & Push"}
               </Button>

@@ -208,21 +208,21 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-white border-gray-200">
         <DialogHeader>
-          <DialogTitle>Deploy "{project.title}" to Vercel</DialogTitle>
+          <DialogTitle className="text-gray-900">Deploy "{project.title}" to Vercel</DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center gap-1 border-b mb-1">
+        <div className="flex items-center gap-1 border-b border-gray-200 mb-1">
           <button
             onClick={() => setTab("deploy")}
-            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${tab === "deploy" ? "border-violet-500 text-foreground" : "border-transparent text-muted-foreground"}`}
+            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${tab === "deploy" ? "border-blue-600 text-gray-900" : "border-transparent text-gray-400"}`}
           >
             Deploy
           </button>
           <button
             onClick={() => setTab("history")}
-            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${tab === "history" ? "border-violet-500 text-foreground" : "border-transparent text-muted-foreground"}`}
+            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${tab === "history" ? "border-blue-600 text-gray-900" : "border-transparent text-gray-400"}`}
           >
             History {history.length > 0 && `(${history.length})`}
           </button>
@@ -230,19 +230,20 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
 
         {tab === "deploy" && phase === "form" && (
           <div className="space-y-3 py-2 max-h-72 overflow-auto">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-500">
               {Object.keys(envVars).length > 0
                 ? "We found these environment variables referenced in your code — fill in the values Vercel should use."
                 : "No environment variables detected in this project's code."}
             </p>
             {Object.keys(envVars).map((key) => (
               <div key={key} className="space-y-1">
-                <Label htmlFor={`env-${key}`} className="font-mono text-xs">{key}</Label>
+                <Label htmlFor={`env-${key}`} className="font-mono text-xs text-gray-700">{key}</Label>
                 <Input
                   id={`env-${key}`}
                   value={envVars[key]}
                   onChange={(e) => setEnvVars((prev) => ({ ...prev, [key]: e.target.value }))}
                   placeholder="Value (optional)"
+                  className="bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus-visible:ring-blue-500/30"
                 />
               </div>
             ))}
@@ -251,9 +252,9 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
 
         {tab === "deploy" && phase === "building" && (
           <div className="py-10 text-center space-y-3">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-violet-500" />
-            <p className="text-sm font-medium">Deploying to Vercel...</p>
-            <p className="text-xs text-muted-foreground">This usually takes 10-30 seconds.</p>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
+            <p className="text-sm font-medium text-gray-900">Deploying to Vercel...</p>
+            <p className="text-xs text-gray-500">This usually takes 10-30 seconds.</p>
           </div>
         )}
 
@@ -261,9 +262,9 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
           <div className="py-4 space-y-4 max-h-96 overflow-auto">
             <div className="text-center space-y-3">
               <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-              <p className="font-semibold">Deployed successfully!</p>
+              <p className="font-semibold text-gray-900">Deployed successfully!</p>
               {deployUrl && (
-                <a href={deployUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-violet-600 hover:underline">
+                <a href={deployUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
                   {deployUrl} <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               )}
@@ -271,7 +272,7 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
 
             {!scores && (
               <div className="text-center">
-                <Button size="sm" variant="outline" onClick={handleAnalyze} disabled={analyzing} className="gap-1.5">
+                <Button size="sm" variant="outline" onClick={handleAnalyze} disabled={analyzing} className="gap-1.5 border-gray-200 text-gray-600 hover:bg-gray-50">
                   <Gauge className="h-3.5 w-3.5" /> {analyzing ? "Analyzing (Lighthouse)..." : "Run AI Deployment Review"}
                 </Button>
               </div>
@@ -286,31 +287,31 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
                     ["Accessibility", scores.accessibility],
                     ["Best Practices", scores.best_practices],
                   ] as const).map(([label, value]) => (
-                    <div key={label} className="rounded-lg border p-2">
-                      <p className={`text-lg font-bold ${value >= 90 ? "text-emerald-500" : value >= 50 ? "text-amber-500" : "text-red-500"}`}>{value}</p>
-                      <p className="text-[10px] text-muted-foreground">{label}</p>
+                    <div key={label} className="rounded-lg border border-gray-200 p-2">
+                      <p className={`text-lg font-bold ${value >= 90 ? "text-emerald-600" : value >= 50 ? "text-amber-600" : "text-red-600"}`}>{value}</p>
+                      <p className="text-[10px] text-gray-500">{label}</p>
                     </div>
                   ))}
                 </div>
 
                 {suggestions.length > 0 ? (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Suggestions</p>
+                    <p className="text-xs font-medium text-gray-500">Suggestions</p>
                     {suggestions.map((s, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs rounded-md bg-muted/50 p-2">
-                        <Sparkles className="h-3 w-3 mt-0.5 text-violet-500 flex-shrink-0" />
+                      <div key={i} className="flex items-start gap-2 text-xs rounded-md bg-gray-50 border border-gray-100 p-2">
+                        <Sparkles className="h-3 w-3 mt-0.5 text-blue-500 flex-shrink-0" />
                         <div>
-                          <p className="font-medium">{s.title}</p>
-                          <p className="text-muted-foreground">{s.detail}</p>
+                          <p className="font-medium text-gray-900">{s.title}</p>
+                          <p className="text-gray-500">{s.detail}</p>
                         </div>
                       </div>
                     ))}
-                    <Button size="sm" onClick={handleApplyAll} disabled={applyingFixes} className="w-full gap-1.5">
+                    <Button size="sm" onClick={handleApplyAll} disabled={applyingFixes} className="w-full gap-1.5 bg-blue-600 text-white hover:bg-blue-700">
                       <Sparkles className="h-3.5 w-3.5" /> {applyingFixes ? "Applying fixes..." : "Apply All (creates a draft)"}
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center">No major issues found — nice work!</p>
+                  <p className="text-xs text-gray-500 text-center">No major issues found — nice work!</p>
                 )}
               </div>
             )}
@@ -324,21 +325,21 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
               <p className="font-semibold text-sm">Deployment failed</p>
             </div>
             {errorMessage && (
-              <p className="text-sm bg-red-500/10 border border-red-500/30 rounded-md p-2.5 font-mono">{errorMessage}</p>
+              <p className="text-sm bg-red-50 border border-red-200 text-red-700 rounded-md p-2.5 font-mono">{errorMessage}</p>
             )}
 
             {!explanation && (
-              <Button size="sm" variant="outline" onClick={handleExplain} disabled={explaining} className="gap-1.5">
+              <Button size="sm" variant="outline" onClick={handleExplain} disabled={explaining} className="gap-1.5 border-gray-200 text-gray-600 hover:bg-gray-50">
                 <Sparkles className="h-3.5 w-3.5" /> {explaining ? "Analyzing..." : "Explain with AI"}
               </Button>
             )}
 
             {explanation && (
-              <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-3 space-y-2">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-600"><Sparkles className="h-3 w-3" /> AI explanation</p>
-                <p className="text-sm">{explanation.explanation}</p>
+              <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 space-y-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-600"><Sparkles className="h-3 w-3" /> AI explanation</p>
+                <p className="text-sm text-gray-700">{explanation.explanation}</p>
                 {explanation.suggested_command && (
-                  <div className="bg-black/90 rounded-md p-2 mt-1">
+                  <div className="bg-gray-900 rounded-md p-2 mt-1">
                     <code className="text-[11px] font-mono text-emerald-400">{explanation.suggested_command}</code>
                   </div>
                 )}
@@ -346,7 +347,7 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
             )}
 
             {logs.length > 0 && (
-              <div className="bg-black/90 rounded-md p-2.5 max-h-40 overflow-auto">
+              <div className="bg-gray-900 rounded-md p-2.5 max-h-40 overflow-auto">
                 {logs.map((line, i) => (
                   <p key={i} className="text-[11px] font-mono text-gray-300 whitespace-pre-wrap">{line}</p>
                 ))}
@@ -358,15 +359,15 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
         {tab === "history" && (
           <div className="space-y-2 py-2 max-h-80 overflow-auto">
             {history.length === 0 && (
-              <p className="text-sm text-muted-foreground py-6 text-center">No deployments yet.</p>
+              <p className="text-sm text-gray-400 py-6 text-center">No deployments yet.</p>
             )}
             {history.map((d) => (
-              <div key={d.id} className="rounded-lg border p-2.5 space-y-1.5">
+              <div key={d.id} className="rounded-lg border border-gray-200 p-2.5 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1.5 font-medium">
+                  <span className="flex items-center gap-1.5 font-medium text-gray-900">
                     {statusIcon(d.status)}
                     {d.provider === "vercel" ? "Vercel" : "Quick deploy"}
-                    <span className="text-muted-foreground font-normal">· {new Date(d.created_at).toLocaleString()}</span>
+                    <span className="text-gray-400 font-normal">· {new Date(d.created_at).toLocaleString()}</span>
                   </span>
                 </div>
                 {d.error_message && (
@@ -374,7 +375,7 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
                 )}
                 <div className="flex items-center gap-2 pt-0.5">
                   {d.deploy_url && d.status === "success" && (
-                    <a href={d.deploy_url} target="_blank" rel="noreferrer" className="text-[11px] text-violet-600 hover:underline inline-flex items-center gap-0.5">
+                    <a href={d.deploy_url} target="_blank" rel="noreferrer" className="text-[11px] text-blue-600 hover:underline inline-flex items-center gap-0.5">
                       Visit <ExternalLink className="h-2.5 w-2.5" />
                     </a>
                   )}
@@ -382,14 +383,14 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
                     <button
                       onClick={() => handleRollback(d)}
                       disabled={rollingBackId === d.id}
-                      className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                      className="text-[11px] text-gray-400 hover:text-gray-700 inline-flex items-center gap-0.5"
                     >
                       <RotateCcw className="h-2.5 w-2.5" /> {rollingBackId === d.id ? "Rolling back..." : "Rollback to this"}
                     </button>
                   )}
                   <button
                     onClick={() => handleRedeploy(d)}
-                    className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                    className="text-[11px] text-gray-400 hover:text-gray-700 inline-flex items-center gap-0.5"
                   >
                     <RefreshCw className="h-2.5 w-2.5" /> Redeploy
                   </button>
@@ -400,11 +401,11 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" onClick={handleClose} className="border-gray-200 text-gray-600 hover:bg-gray-50">
             {tab === "deploy" && (phase === "success" || phase === "failed") ? "Close" : "Cancel"}
           </Button>
-          {tab === "deploy" && phase === "form" && <Button onClick={handleDeploy}>Deploy</Button>}
-          {tab === "deploy" && phase === "failed" && <Button onClick={() => setPhase("form")}>Try Again</Button>}
+          {tab === "deploy" && phase === "form" && <Button onClick={handleDeploy} className="bg-blue-600 text-white hover:bg-blue-700">Deploy</Button>}
+          {tab === "deploy" && phase === "failed" && <Button onClick={() => setPhase("form")} className="bg-blue-600 text-white hover:bg-blue-700">Try Again</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

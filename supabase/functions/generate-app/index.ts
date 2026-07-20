@@ -1,6 +1,7 @@
 // path: supabase/functions/generate-app/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +11,7 @@ const corsHeaders = {
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const ANTHROPIC_MODEL = "claude-opus-4-8";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 const PROMPT_ENHANCERS: Record<string, string> = {
@@ -61,6 +63,77 @@ async function callGemini(apiKey: string, systemPrompt: string, userPrompt: stri
     }),
   });
   return response;
+}
+
+/** Carries the upstream HTTP status so a Gemini rate-limit can still be reported after a fallback attempt. */
+class ProviderError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** Gemini is the primary provider. Throws with a descriptive message on any failure. */
+async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const response = await callGemini(apiKey, systemPrompt, userPrompt);
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("Gemini API error:", response.status, text);
+    throw new ProviderError(`Gemini API error: ${response.status}`, response.status);
+  }
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!content) throw new Error("No content in Gemini response");
+  return content;
+}
+
+/** Claude is the fallback provider, used only when Gemini fails and an Anthropic key is configured. */
+async function generateWithClaude(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const client = new Anthropic({ apiKey });
+  const message = await client.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 16000,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const textBlock = message.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") throw new Error("No content in Claude response");
+  return textBlock.text;
+}
+
+/**
+ * Tries Gemini first; falls back to Claude only on a Gemini failure — including
+ * a response that doesn't parse as JSON — and only if ANTHROPIC_API_KEY is
+ * configured. Returns the already-parsed JSON so callers don't need to
+ * re-parse (and can't accidentally skip the fallback on a parse failure).
+ */
+async function generateContent(
+  systemPrompt: string,
+  userPrompt: string,
+  geminiKey: string,
+  anthropicKey: string | undefined,
+): Promise<{ parsed: any; provider: "gemini" | "claude" }> {
+  try {
+    const content = await generateWithGemini(geminiKey, systemPrompt, userPrompt);
+    return { parsed: parseJSON(content), provider: "gemini" };
+  } catch (geminiErr) {
+    const geminiMessage = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+    if (!anthropicKey) throw geminiErr;
+
+    console.error(`Gemini failed (${geminiMessage}) — falling back to Claude`);
+    try {
+      const content = await generateWithClaude(anthropicKey, systemPrompt, userPrompt);
+      return { parsed: parseJSON(content), provider: "claude" };
+    } catch (claudeErr) {
+      const claudeMessage = claudeErr instanceof Error ? claudeErr.message : String(claudeErr);
+      console.error("Claude fallback also failed:", claudeMessage);
+      const combinedMessage = `Gemini failed (${geminiMessage}) and Claude fallback also failed (${claudeMessage})`;
+      // Preserve a 429 signal from Gemini so the client still knows to retry later.
+      const status = geminiErr instanceof ProviderError && geminiErr.status === 429 ? 429 : 502;
+      throw new ProviderError(combinedMessage, status);
+    }
+  }
 }
 
 function parseJSON(content: string): any {
@@ -121,6 +194,8 @@ serve(async (req) => {
     if (!GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY is not configured");
     }
+    // Optional — enables an automatic Claude fallback when Gemini fails.
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
     // --- Credits: fetch, reset if a day has passed, and check balance ---
     const { data: profile, error: profileError } = await supabase
@@ -187,26 +262,22 @@ Requirements:
 - Do NOT include any script tags in the HTML
 - Do NOT include any import statements in the HTML`;
 
-      const response = await callGemini(GEMINI_API_KEY, systemPrompt, enhancedPrompt);
-
-      if (!response.ok) {
-        const text = await response.text();
-        console.error("Gemini API error:", response.status, text);
-        if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({ error: `Gemini API error: ${response.status}` }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      let generated: { parsed: any; provider: "gemini" | "claude" };
+      try {
+        generated = await generateContent(systemPrompt, enhancedPrompt, GEMINI_API_KEY, ANTHROPIC_API_KEY);
+      } catch (err) {
+        const status = err instanceof ProviderError ? err.status : 502;
+        const message = status === 429
+          ? "Rate limit exceeded. Please try again in a moment."
+          : err instanceof Error ? err.message : "AI generation failed";
+        return new Response(JSON.stringify({ error: message }), {
+          status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const data = await response.json();
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!content) throw new Error("No content in AI response");
+      if (generated.provider === "claude") console.log("Generated with Claude fallback");
 
-      const parsed = parseJSON(content);
+      const parsed = generated.parsed;
       const result = {
         title: parsed.title || prompt.slice(0, 60),
         type: parsed.type || type,
@@ -260,26 +331,22 @@ CRITICAL Requirements:
 - Do NOT include <html>, <head>, or <body> tags - just the body innerHTML
 - The "name" field should be the filename without .html extension (e.g., "index", "about", "contact")`;
 
-    const response = await callGemini(GEMINI_API_KEY, systemPrompt, enhancedPrompt);
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("Gemini API error:", response.status, text);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: `Gemini API error: ${response.status}` }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    let generated: { parsed: any; provider: "gemini" | "claude" };
+    try {
+      generated = await generateContent(systemPrompt, enhancedPrompt, GEMINI_API_KEY, ANTHROPIC_API_KEY);
+    } catch (err) {
+      const status = err instanceof ProviderError ? err.status : 502;
+      const message = status === 429
+        ? "Rate limit exceeded. Please try again in a moment."
+        : err instanceof Error ? err.message : "AI generation failed";
+      return new Response(JSON.stringify({ error: message }), {
+        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) throw new Error("No content in AI response");
+    if (generated.provider === "claude") console.log("Generated with Claude fallback");
 
-    const parsed = parseJSON(content);
+    const parsed = generated.parsed;
 
     const pages = Array.isArray(parsed.pages) && parsed.pages.length > 0
       ? parsed.pages.map((p: any) => ({
