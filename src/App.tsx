@@ -15,6 +15,10 @@ import Dashboard from "./pages/Dashboard.tsx";
 import Resources from "./pages/Resources.tsx";
 import SharePage from "./pages/SharePage.tsx";
 import Editor from "./pages/Editor.tsx";
+import About from "./pages/About.tsx";
+import Contact from "./pages/Contact.tsx";
+import Privacy from "./pages/Privacy.tsx";
+import Terms from "./pages/Terms.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -36,6 +40,10 @@ const App = () => (
             <Route path="/dashboard/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
             <Route path="/share/:slug" element={<SharePage />} />
             <Route path="/editor/:id" element={<ProtectedRoute><Editor /></ProtectedRoute>} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

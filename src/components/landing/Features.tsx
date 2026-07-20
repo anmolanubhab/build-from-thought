@@ -1,36 +1,82 @@
-import { Sparkles, Monitor, Code2, Database, ShieldCheck, CloudUpload } from "lucide-react";
+import {
+  Sparkles,
+  Monitor,
+  Code2,
+  CloudUpload,
+  Share2,
+  Github,
+  ShieldCheck,
+  Smartphone,
+} from "lucide-react";
 
 const features = [
-  { icon: Sparkles, title: "AI Prompt Builder", desc: "Write a natural language prompt and let AI interpret your vision into a complete app." },
-  { icon: Monitor, title: "Live UI Generator", desc: "See your app come to life instantly with a real-time visual preview." },
-  { icon: Code2, title: "Full-Stack Code Export", desc: "Export production-ready frontend and backend code you fully own." },
-  { icon: Database, title: "Database Integration", desc: "Auto-generate schemas, tables, and queries — no SQL required." },
-  { icon: ShieldCheck, title: "Authentication System", desc: "Built-in user auth with login, signup, and role management." },
-  { icon: CloudUpload, title: "Deployment Ready", desc: "One-click deploy to a global CDN with a custom domain." },
+  {
+    icon: Sparkles,
+    title: "AI App Generation",
+    desc: "Describe your idea in plain English and let AI generate a complete, working application.",
+  },
+  {
+    icon: Monitor,
+    title: "Live Preview",
+    desc: "Watch your app render in real time as it's built — no refresh, no waiting.",
+  },
+  {
+    icon: Code2,
+    title: "Code Editing",
+    desc: "Jump into the generated code and refine it directly in a full-featured editor.",
+  },
+  {
+    icon: CloudUpload,
+    title: "One-Click Deployment",
+    desc: "Ship your app to production in a single click, with zero infrastructure setup.",
+  },
+  {
+    icon: Share2,
+    title: "Share Projects",
+    desc: "Send a live link so teammates or clients can view and try your app instantly.",
+  },
+  {
+    icon: Github,
+    title: "GitHub Integration",
+    desc: "Push your generated code straight to a GitHub repository you control.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Authentication",
+    desc: "Built-in sign-up, login, and session handling, ready to use out of the box.",
+  },
+  {
+    icon: Smartphone,
+    title: "Responsive Design",
+    desc: "Every generated app works cleanly across desktop, tablet, and mobile.",
+  },
 ];
 
 const Features = () => (
-  <section id="features" className="py-20 lg:py-28">
+  <section id="features" className="py-20 lg:py-28 bg-white">
     <div className="container mx-auto px-4">
-      <h2 className="font-display text-3xl lg:text-4xl font-bold text-center mb-4">
-        Powerful <span className="gradient-text">Features</span>
-      </h2>
-      <p className="text-center text-muted-foreground mb-16 max-w-xl mx-auto">
-        Everything you need to build, ship, and scale web apps with AI.
-      </p>
+      <div className="text-center mb-16">
+        <span className="text-sm font-semibold text-blue-600 mb-3 block">Why WebdevsAI</span>
+        <h2 className="font-display text-3xl lg:text-4xl font-bold text-gray-900 mb-4 tracking-tight">
+          Everything you need, built in
+        </h2>
+        <p className="text-gray-500 max-w-xl mx-auto">
+          Real capabilities that take you from idea to production, not just a pretty prompt box.
+        </p>
+      </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {features.map(({ icon: Icon, title, desc }, i) => (
           <div
             key={title}
-            className="glass rounded-xl p-6 neon-glow fade-up"
-            style={{ animationDelay: `${i * 0.1}s` }}
+            className="group rounded-2xl border border-gray-200 bg-white p-6 fade-up transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/60 hover:border-gray-300"
+            style={{ animationDelay: `${i * 0.06}s` }}
           >
-            <div className="w-12 h-12 rounded-lg gradient-bg flex items-center justify-center mb-4">
-              <Icon size={22} className="text-primary-foreground" />
+            <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-blue-100 group-hover:scale-110 group-hover:-rotate-6">
+              <Icon size={20} className="text-blue-600 transition-transform duration-300 group-hover:rotate-6" />
             </div>
-            <h3 className="font-display text-lg font-bold text-foreground mb-2">{title}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+            <h3 className="font-display text-base font-bold text-gray-900 mb-1.5">{title}</h3>
+            <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
           </div>
         ))}
       </div>

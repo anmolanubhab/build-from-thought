@@ -60,25 +60,25 @@ export default function PlanInterestDialog({ open, onClose, plan }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-white text-gray-900 border-gray-200">
         {submitted ? (
           <div className="py-6 text-center space-y-3">
             <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto" />
-            <p className="font-semibold text-foreground">
+            <p className="font-semibold text-gray-900">
               {isPro ? "You're on the waitlist!" : "Thanks — we'll be in touch"}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-500">
               {isPro
                 ? "We'll email you as soon as Pro plans are available."
                 : "Our team will reach out to your email about Enterprise."}
             </p>
-            <Button onClick={handleClose} className="mt-2">Close</Button>
+            <Button onClick={handleClose} className="mt-2 bg-blue-600 text-white hover:bg-blue-700">Close</Button>
           </div>
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{isPro ? "Join the Pro waitlist" : "Contact Sales"}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-gray-900">{isPro ? "Join the Pro waitlist" : "Contact Sales"}</DialogTitle>
+              <DialogDescription className="text-gray-500">
                 {isPro
                   ? "Pro billing isn't live yet — leave your email and we'll notify you the moment it launches."
                   : "Tell us a bit about your team and we'll follow up about Enterprise."}
@@ -87,32 +87,34 @@ export default function PlanInterestDialog({ open, onClose, plan }: Props) {
 
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <Label htmlFor="plan-interest-email">Email</Label>
+                <Label htmlFor="plan-interest-email" className="text-gray-700">Email</Label>
                 <Input
                   id="plan-interest-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
+                  className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus-visible:ring-blue-500/30"
                 />
               </div>
               {!isPro && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="plan-interest-message">What are you looking for? (optional)</Label>
+                  <Label htmlFor="plan-interest-message" className="text-gray-700">What are you looking for? (optional)</Label>
                   <Textarea
                     id="plan-interest-message"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Team size, use case, timeline..."
                     rows={3}
+                    className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus-visible:ring-blue-500/30"
                   />
                 </div>
               )}
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={handleClose}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={submitting || !email.trim()}>
+              <Button variant="outline" onClick={handleClose} className="border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</Button>
+              <Button onClick={handleSubmit} disabled={submitting || !email.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
                 {submitting ? "Submitting..." : isPro ? "Join Waitlist" : "Send"}
               </Button>
             </DialogFooter>

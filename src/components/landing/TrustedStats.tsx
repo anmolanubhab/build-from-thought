@@ -1,24 +1,25 @@
-import { Users, FolderKanban, Globe } from "lucide-react";
+import { ReactIcon, TypeScriptIcon, TailwindIcon, SupabaseIcon, VercelIcon, GitHubIcon } from "./TechIcons";
 
-const stats = [
-  { icon: Users, label: "Developers", value: "10K+" },
-  { icon: FolderKanban, label: "Projects Built", value: "3K+" },
-  { icon: Globe, label: "Countries", value: "50+" },
+const stack = [
+  { name: "React", Icon: ReactIcon },
+  { name: "TypeScript", Icon: TypeScriptIcon },
+  { name: "Tailwind CSS", Icon: TailwindIcon },
+  { name: "Supabase", Icon: SupabaseIcon },
+  { name: "Vercel", Icon: VercelIcon },
+  { name: "GitHub", Icon: GitHubIcon },
 ];
 
 const TrustedStats = () => (
-  <section className="py-16">
+  <section className="py-16 border-y border-gray-100 bg-gray-50/50">
     <div className="container mx-auto px-4">
-      <div className="glass rounded-2xl py-10 px-6 flex flex-col sm:flex-row items-center justify-around gap-8">
-        {stats.map(({ icon: Icon, label, value }) => (
-          <div key={label} className="flex items-center gap-4 text-center sm:text-left">
-            <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center shrink-0">
-              <Icon size={22} className="text-primary-foreground" />
-            </div>
-            <div>
-              <p className="font-display text-2xl font-bold text-foreground">{value}</p>
-              <p className="text-sm text-muted-foreground">{label}</p>
-            </div>
+      <p className="text-center text-xs font-semibold tracking-widest text-gray-400 uppercase mb-10">
+        Built on a modern, production-grade stack
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
+        {stack.map(({ name, Icon }) => (
+          <div key={name} className="flex items-center gap-2.5 text-gray-400 hover:text-gray-700 transition-colors">
+            <Icon className="w-6 h-6" />
+            <span className="text-sm font-medium">{name}</span>
           </div>
         ))}
       </div>
