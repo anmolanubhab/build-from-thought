@@ -13,6 +13,11 @@ export function detectEnvVars(project: Project): string[] {
   const sources: string[] = [project.html || "", project.css || "", project.react_code || ""];
   const pages = getProjectPages(project);
   for (const p of pages) sources.push(p.html || "");
+  if (project.files && typeof project.files === "object") {
+    for (const content of Object.values(project.files)) {
+      if (typeof content === "string") sources.push(content);
+    }
+  }
 
   const text = sources.join("\n");
   const found = new Set<string>();

@@ -16,6 +16,7 @@ import {
 } from "@/services/vercelDeploy";
 import { analyzeDeployment, applyAiFixes, type LighthouseScores, type AiSuggestion } from "@/services/aiReview";
 import { createDraft } from "@/services/versions";
+import { getProjectDatabase } from "@/services/database";
 import { CheckCircle2, XCircle, Loader2, ExternalLink, Sparkles, RotateCcw, RefreshCw, Gauge } from "lucide-react";
 
 interface Props {
@@ -61,6 +62,20 @@ export default function DeployToVercelDialog({ open, onClose, project }: Props) 
       setScores(null);
       setSuggestions([]);
       refreshHistory();
+
+      // Auto-fill Supabase env vars from a connected project database, if one exists —
+      // saves the user from having to copy the URL/anon key in by hand.
+      getProjectDatabase(project.id)
+        .then((db) => {
+          if (!db || db.status !== "ready" || !db.project_url || !db.anon_key) return;
+          setEnvVars((prev) => {
+            const next = { ...prev };
+            if ("NEXT_PUBLIC_SUPABASE_URL" in next) next.NEXT_PUBLIC_SUPABASE_URL = db.project_url as string;
+            if ("NEXT_PUBLIC_SUPABASE_ANON_KEY" in next) next.NEXT_PUBLIC_SUPABASE_ANON_KEY = db.anon_key as string;
+            return next;
+          });
+        })
+        .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, project]);

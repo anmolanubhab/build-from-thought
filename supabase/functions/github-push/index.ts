@@ -116,9 +116,29 @@ Deno.serve(async (req) => {
     const isMultipage = project.is_multipage && Array.isArray(project.pages) && project.pages.length > 0;
 
     if (isModern) {
-      // Modern project: push the complete Next.js file map as-is.
+      // Modern project: push the complete Next.js file map, EXCEPT env files.
+      // .env.local (and any .env* variant) holds the project's Supabase URL/anon key —
+      // even though the anon key is safe to expose in a shipped frontend bundle, it
+      // must never be *committed to a public/private GitHub repo* as a checked-in file
+      // (bad practice, and the repo may later contain other secrets too). Consumers
+      // should configure these via their host's env var UI (already done automatically
+      // for Vercel deploys) or copy .env.example locally.
+      const isEnvFile = (path: string) => /(^|\/)\.env(\..+)?$/.test(path);
       for (const [path, content] of Object.entries(project.files as Record<string, string>)) {
-        if (typeof content === "string") files[path] = content;
+        if (typeof content !== "string") continue;
+        if (isEnvFile(path)) continue;
+        files[path] = content;
+      }
+      // Provide a safe, secret-free template instead so the repo is still self-documenting.
+      if (Object.keys(project.files as Record<string, string>).some((p) => isEnvFile(p)) && !files[".env.example"]) {
+        files[".env.example"] = `# Copy to .env.local and fill in from your Supabase project settings.\nNEXT_PUBLIC_SUPABASE_URL=\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\n`;
+      }
+      // Make sure a pushed .gitignore actually ignores env files, in case the generated
+      // project's own .gitignore (if any) didn't already cover it.
+      if (files[".gitignore"] && !/(^|\n)\.env/.test(files[".gitignore"])) {
+        files[".gitignore"] += `\n.env\n.env.local\n.env.*.local\n`;
+      } else if (!files[".gitignore"]) {
+        files[".gitignore"] = `node_modules\n.env\n.env.local\n.env.*.local\n.next\ndist\n`;
       }
     } else if (isMultipage) {
       for (const page of project.pages) {

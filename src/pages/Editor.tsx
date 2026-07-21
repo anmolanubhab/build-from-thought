@@ -15,6 +15,7 @@ import {
 import PromptPanel, { PromptEntry } from "@/components/editor/PromptPanel";
 import PreviewPanel from "@/components/editor/PreviewPanel";
 import VersionHistoryDialog from "@/components/editor/VersionHistoryDialog";
+import DatabaseConnectPanel from "@/components/editor/DatabaseConnectPanel";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ProjectSnapshot {
@@ -251,6 +252,19 @@ export default function Editor() {
     }
   };
 
+  const handleDatabaseProvisioned = async (files: Record<string, string>, summary: string) => {
+    if (!project) return;
+    setUndoStack((prev) => [
+      ...prev,
+      { html: project.html || "", css: project.css || "", react_code: project.react_code || "", pages: project.pages, files: project.files ?? null },
+    ]);
+    const updated: Project = { ...project, files, react_code: files["app/page.tsx"] || project.react_code };
+    setProject(updated);
+    await saveDraft(project.html || "", project.css || "", updated.react_code || "", project.pages, summary, files);
+    setHistory((prev) => [...prev, { id: crypto.randomUUID(), text: summary, timestamp: new Date(), status: "success", summary }]);
+    toast({ title: "Database connected", description: summary });
+  };
+
   const handleRolledBack = async () => {
     if (!id || !user) return;
     const { data } = await supabase.from("projects").select("*").eq("id", id).eq("user_id", user.id).single();
@@ -328,6 +342,12 @@ export default function Editor() {
           </button>
         </div>
       )}
+
+      <DatabaseConnectPanel
+        projectId={project.id}
+        needsDatabase={Boolean((project.plan as { needs_database?: boolean } | null | undefined)?.needs_database)}
+        onProvisioned={handleDatabaseProvisioned}
+      />
 
       <div className="flex-1 flex overflow-hidden relative">
         <div className={`${isMobile ? "absolute inset-0 z-30" : "w-[360px] flex-shrink-0 border-r border-gray-200"} ${isMobile && !panelOpen ? "hidden" : ""} transition-all`}>
