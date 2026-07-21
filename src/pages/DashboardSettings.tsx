@@ -15,7 +15,18 @@ import WorkspaceSection from "@/components/settings/WorkspaceSection";
 import PlansSection from "@/components/settings/PlansSection";
 import PeopleSection from "@/components/settings/PeopleSection";
 import GitSection from "@/components/settings/GitSection";
-import ComingSoonSection from "@/components/settings/ComingSoonSection";
+import DevicesSection from "@/components/settings/DevicesSection";
+import GroupsSection from "@/components/settings/GroupsSection";
+import IdentitySection from "@/components/settings/IdentitySection";
+import KnowledgeSection from "@/components/settings/KnowledgeSection";
+import SkillsSection from "@/components/settings/SkillsSection";
+import TemplatesSection from "@/components/settings/TemplatesSection";
+import DesignSystemsSection from "@/components/settings/DesignSystemsSection";
+import McpServerSection from "@/components/settings/McpServerSection";
+import WorkspaceDomainsSection from "@/components/settings/WorkspaceDomainsSection";
+import PrivacySecuritySection from "@/components/settings/PrivacySecuritySection";
+import SecurityCenterSection from "@/components/settings/SecurityCenterSection";
+import AuditLogSection from "@/components/settings/AuditLogSection";
 
 type SectionId =
   | "account" | "devices"
@@ -90,7 +101,7 @@ const DashboardSettings = () => {
 
   const renderSection = () => {
     if (section === "account") return <AccountSection />;
-    if (section === "devices") return <ComingSoonSection icon={Laptop} title="Devices & apps" description="Manage where you're signed in and connected apps." />;
+    if (section === "devices") return <DevicesSection />;
     if (section === "workspace") {
       if (!currentWorkspace) return null;
       return <WorkspaceSection workspace={currentWorkspace} workspaceCount={workspaces.length} currentUserId={user?.id} onWorkspaceUpdated={(w) => setWorkspaces((prev) => prev.map((x) => (x.id === w.id ? w : x)))} />;
@@ -100,18 +111,45 @@ const DashboardSettings = () => {
       if (!currentWorkspace) return null;
       return <PeopleSection workspace={currentWorkspace} currentUserId={user?.id} />;
     }
-    if (section === "groups") return <ComingSoonSection icon={UsersRound} title="Groups" description="Organize members into groups with shared permissions." />;
-    if (section === "identity") return <ComingSoonSection icon={Fingerprint} title="Identity" description="Single sign-on and identity provider settings." />;
-    if (section === "knowledge") return <ComingSoonSection icon={BookOpen} title="Knowledge" description="Give the AI extra context about your product and codebase." />;
-    if (section === "skills") return <ComingSoonSection icon={Wand2} title="Skills" description="Reusable AI instructions your workspace can invoke." />;
-    if (section === "templates") return <ComingSoonSection icon={LayoutTemplate} title="Templates" description="Save your own starting points for new projects." />;
-    if (section === "design-systems") return <ComingSoonSection icon={Palette} title="Design systems" description="Reusable design tokens and component libraries." />;
+    if (section === "groups") {
+      if (!currentWorkspace) return null;
+      return <GroupsSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
+    if (section === "identity") return <IdentitySection />;
+    if (section === "knowledge") {
+      if (!currentWorkspace) return null;
+      return <KnowledgeSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
+    if (section === "skills") {
+      if (!currentWorkspace) return null;
+      return <SkillsSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
+    if (section === "templates") {
+      if (!currentWorkspace) return null;
+      return <TemplatesSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
+    if (section === "design-systems") {
+      if (!currentWorkspace) return null;
+      return <DesignSystemsSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
     if (section === "git") return <GitSection />;
-    if (section === "mcp") return <ComingSoonSection icon={Server} title="MCP server" description="Connect external tools to WebdevsAI via the Model Context Protocol." />;
-    if (section === "domains") return <ComingSoonSection icon={Globe} title="Workspace domains" description="Manage custom domains at the workspace level. For now, domains are configured per project from the Deploy menu." />;
-    if (section === "privacy") return <ComingSoonSection icon={ShieldCheck} title="Privacy & security" description="Two-factor authentication and session controls." />;
-    if (section === "security-center") return <ComingSoonSection icon={ShieldAlert} title="Security center" description="Review security recommendations for your workspace." />;
-    if (section === "audit-logs") return <ComingSoonSection icon={ScrollText} title="Audit logs" description="A history of security-relevant actions in your workspace." />;
+    if (section === "mcp") {
+      if (!currentWorkspace) return null;
+      return <McpServerSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
+    if (section === "domains") {
+      if (!currentWorkspace) return null;
+      return <WorkspaceDomainsSection workspace={currentWorkspace} />;
+    }
+    if (section === "privacy") return <PrivacySecuritySection />;
+    if (section === "security-center") {
+      if (!currentWorkspace) return null;
+      return <SecurityCenterSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
+    if (section === "audit-logs") {
+      if (!currentWorkspace) return null;
+      return <AuditLogSection workspace={currentWorkspace} currentUserId={user?.id} />;
+    }
     return null;
   };
 
