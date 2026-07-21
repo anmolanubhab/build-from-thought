@@ -24,6 +24,33 @@ interface ProjectSnapshot {
   pages?: PageData[] | null;
 }
 
+/** Short ascending two-tone chime, synthesized client-side so no audio asset is needed. */
+function playGenerationCompleteSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const playTone = (freq: number, start: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + start);
+      gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + duration);
+    };
+    playTone(660, 0, 0.12);
+    playTone(880, 0.1, 0.16);
+    setTimeout(() => ctx.close().catch(() => {}), 500);
+  } catch {
+    // Best-effort: sound is a nicety, never block on it.
+  }
+}
+
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -44,6 +71,20 @@ export default function Editor() {
   const [discarding, setDiscarding] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [prefs, setPrefs] = useState<{ chat_suggestions_enabled: boolean; generation_sound_enabled: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("profiles")
+      .select("chat_suggestions_enabled, generation_sound_enabled")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setPrefs(data as unknown as { chat_suggestions_enabled: boolean; generation_sound_enabled: boolean });
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -113,6 +154,7 @@ export default function Editor() {
       if (mode === "suggest") {
         setPreviewChanges(result);
         setHistory((prev) => prev.map((e) => e.id === entryId ? { ...e, status: "success", summary: "Preview ready" } : e));
+        if (prefs?.generation_sound_enabled) playGenerationCompleteSound();
       } else {
         setUndoStack((prev) => [
           ...prev,
@@ -125,6 +167,7 @@ export default function Editor() {
 
         setHistory((prev) => prev.map((e) => e.id === entryId ? { ...e, status: "success", summary: result.summary, changes: result.changes } : e));
         toast({ title: "Draft updated", description: "Preview or publish when you're ready." });
+        if (prefs?.generation_sound_enabled) playGenerationCompleteSound();
       }
     } catch (err) {
       setHistory((prev) => prev.map((e) => (e.id === entryId ? { ...e, status: "error" } : e)));
@@ -283,7 +326,7 @@ export default function Editor() {
 
       <div className="flex-1 flex overflow-hidden relative">
         <div className={`${isMobile ? "absolute inset-0 z-30" : "w-[360px] flex-shrink-0 border-r border-gray-200"} ${isMobile && !panelOpen ? "hidden" : ""} transition-all`}>
-          <PromptPanel history={history} loading={editing} onSubmit={handleSubmit} onUndo={handleUndo} canUndo={undoStack.length > 0} />
+          <PromptPanel history={history} loading={editing} onSubmit={handleSubmit} onUndo={handleUndo} canUndo={undoStack.length > 0} suggestionsEnabled={prefs?.chat_suggestions_enabled ?? true} />
         </div>
         <div className="flex-1 min-w-0">
           <PreviewPanel

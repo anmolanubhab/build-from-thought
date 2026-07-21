@@ -18,7 +18,7 @@ export interface WorkspaceMember {
   user_id: string;
   role: "owner" | "member";
   created_at: string;
-  profile?: { display_name: string | null; username: string | null } | null;
+  profile?: { display_name: string | null; username: string | null; avatar_url: string | null; is_public: boolean } | null;
 }
 
 export const CURRENT_WORKSPACE_STORAGE_KEY = "current_workspace_id";

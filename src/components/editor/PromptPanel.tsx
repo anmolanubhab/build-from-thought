@@ -17,6 +17,8 @@ interface PromptPanelProps {
   onSubmit: (prompt: string, mode: "apply" | "suggest") => void;
   onUndo: () => void;
   canUndo: boolean;
+  /** Defaults to true. Set from the user's Account > Preferences > "Chat suggestions" setting. */
+  suggestionsEnabled?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -27,7 +29,7 @@ const SUGGESTIONS = [
   "Change the color scheme to blue tones",
 ];
 
-export default function PromptPanel({ history, loading, onSubmit, onUndo, canUndo }: PromptPanelProps) {
+export default function PromptPanel({ history, loading, onSubmit, onUndo, canUndo, suggestionsEnabled = true }: PromptPanelProps) {
   const [prompt, setPrompt] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
@@ -124,7 +126,7 @@ export default function PromptPanel({ history, loading, onSubmit, onUndo, canUnd
       </div>
 
       {/* Suggestions */}
-      {showSuggestions && (
+      {suggestionsEnabled && showSuggestions && (
         <div className="px-3 pb-2 border-t border-gray-800 pt-2">
           <p className="text-[11px] text-gray-500 font-medium mb-1.5 px-1">Suggestions</p>
           <div className="space-y-1">
@@ -156,7 +158,7 @@ export default function PromptPanel({ history, loading, onSubmit, onUndo, canUnd
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={() => !prompt && setShowSuggestions(true)}
+            onFocus={() => suggestionsEnabled && !prompt && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             placeholder="Type your instruction to edit or create features..."
             disabled={loading}
@@ -164,13 +166,16 @@ export default function PromptPanel({ history, loading, onSubmit, onUndo, canUnd
             className="w-full bg-transparent text-sm text-gray-200 placeholder:text-gray-600 px-3 py-2.5 resize-none outline-none disabled:opacity-50"
           />
           <div className="flex items-center justify-between px-2 pb-2">
-            <button
-              onClick={() => setShowSuggestions(!showSuggestions)}
-              className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
-              title="Suggestions"
-            >
-              <Sparkles className="h-4 w-4" />
-            </button>
+            {suggestionsEnabled && (
+              <button
+                onClick={() => setShowSuggestions(!showSuggestions)}
+                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                title="Suggestions"
+              >
+                <Sparkles className="h-4 w-4" />
+              </button>
+            )}
+            {!suggestionsEnabled && <div />}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => handleSubmit("suggest")}

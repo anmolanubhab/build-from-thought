@@ -77,7 +77,12 @@ export default function PeopleSection({ workspace, currentUserId }: Props) {
           {loading && <p className="text-sm text-gray-400 text-center py-6">Loading members...</p>}
           {!loading && members.map((m) => {
             const isSelf = m.user_id === currentUserId;
-            const label = m.profile?.display_name || m.profile?.username || (isSelf ? "You" : "Member");
+            const profileIsPublic = m.profile?.is_public !== false;
+            const label = isSelf
+              ? (m.profile?.display_name || m.profile?.username || "You")
+              : profileIsPublic
+                ? (m.profile?.display_name || m.profile?.username || "Member")
+                : "Member";
             const canRemove = isOwner && m.role !== "owner";
             return (
               <div key={m.id} className="flex items-center justify-between gap-2 py-2.5 border-b border-gray-100 last:border-b-0">

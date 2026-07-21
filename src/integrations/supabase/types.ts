@@ -195,34 +195,52 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          banner_url: string | null
+          chat_suggestions_enabled: boolean
           created_at: string
           credits_daily_limit: number
           credits_remaining: number
           credits_reset_at: string
           display_name: string | null
+          generation_sound_enabled: boolean
           id: string
+          is_public: boolean
+          language: string
+          location: string | null
           updated_at: string
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
+          banner_url?: string | null
+          chat_suggestions_enabled?: boolean
           created_at?: string
           credits_daily_limit?: number
           credits_remaining?: number
           credits_reset_at?: string
           display_name?: string | null
+          generation_sound_enabled?: boolean
           id: string
+          is_public?: boolean
+          language?: string
+          location?: string | null
           updated_at?: string
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
+          banner_url?: string | null
+          chat_suggestions_enabled?: boolean
           created_at?: string
           credits_daily_limit?: number
           credits_remaining?: number
           credits_reset_at?: string
           display_name?: string | null
+          generation_sound_enabled?: boolean
           id?: string
+          is_public?: boolean
+          language?: string
+          location?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -956,6 +974,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delete_own_account: { Args: never; Returns: undefined }
       get_netlify_connection_status: {
         Args: never
         Returns: {

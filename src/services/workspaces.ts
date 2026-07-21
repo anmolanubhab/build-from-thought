@@ -41,7 +41,7 @@ export async function fetchWorkspaceMembers(workspaceId: string): Promise<Worksp
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, display_name, username")
+    .select("id, display_name, username, avatar_url, is_public")
     .in("id", userIds);
 
   const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));

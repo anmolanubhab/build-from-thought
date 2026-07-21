@@ -23,8 +23,10 @@ interface Props {
   currentUserId?: string;
 }
 
-function memberLabel(member: WorkspaceMember | undefined, userId: string): string {
+function memberLabel(member: WorkspaceMember | undefined, userId: string, currentUserId?: string): string {
   if (!member) return "Member";
+  const isSelf = userId === currentUserId;
+  if (!isSelf && member.profile?.is_public === false) return "Member";
   return member.profile?.display_name || member.profile?.username || userId.slice(0, 8);
 }
 
@@ -321,7 +323,7 @@ export default function GroupsSection({ workspace, currentUserId }: Props) {
                         return (
                           <div key={userId} className="flex items-center justify-between gap-2 py-1.5">
                             <span className="text-sm text-gray-700 truncate">
-                              {memberLabel(member, userId)}
+                              {memberLabel(member, userId, currentUserId)}
                               {userId === currentUserId ? " (you)" : ""}
                             </span>
                             {isOwner && (
@@ -353,7 +355,7 @@ export default function GroupsSection({ workspace, currentUserId }: Props) {
                             </option>
                             {nonMembers.map((m) => (
                               <option key={m.user_id} value={m.user_id}>
-                                {memberLabel(m, m.user_id)}
+                                {memberLabel(m, m.user_id, currentUserId)}
                               </option>
                             ))}
                           </select>
