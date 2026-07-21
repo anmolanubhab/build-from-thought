@@ -72,6 +72,68 @@ export async function updateWorkspaceName(workspaceId: string, name: string): Pr
   return data as unknown as Workspace;
 }
 
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+/** Uploads to the workspace-avatars bucket (owner-only write, enforced by storage RLS) and saves the resulting URL. */
+export async function uploadWorkspaceAvatar(workspaceId: string, file: File): Promise<Workspace> {
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+  if (file.size > MAX_AVATAR_BYTES) throw new Error("Image must be under 2MB.");
+
+  const ext = file.name.split(".").pop() || "png";
+  const path = `${workspaceId}/avatar-${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage.from("workspace-avatars").upload(path, file, { upsert: true });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data: urlData } = supabase.storage.from("workspace-avatars").getPublicUrl(path);
+
+  const { data, error } = await supabase
+    .from("workspaces")
+    .update({ avatar_url: urlData.publicUrl } as any)
+    .eq("id", workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as unknown as Workspace;
+}
+
+const HANDLE_PATTERN = /^[a-z0-9-]{3,50}$/;
+
+/** RLS restricts this to the workspace's owner. Maps a unique-constraint violation to a friendly message. */
+export async function updateWorkspaceHandle(workspaceId: string, handle: string): Promise<Workspace> {
+  const normalized = handle.trim().toLowerCase();
+  if (!HANDLE_PATTERN.test(normalized)) {
+    throw new Error("Handles must be 3-50 characters: lowercase letters, numbers, and hyphens only.");
+  }
+
+  const { data, error } = await supabase
+    .from("workspaces")
+    .update({ handle: normalized } as any)
+    .eq("id", workspaceId)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "23505") throw new Error("That handle is already taken.");
+    throw new Error(error.message);
+  }
+  return data as unknown as Workspace;
+}
+
+/** RLS restricts this to the workspace's owner. Applies to members joining from now on, not retroactively. */
+export async function updateWorkspaceMemberDefaults(workspaceId: string, limit: number | null): Promise<Workspace> {
+  const { data, error } = await supabase
+    .from("workspaces")
+    .update({ default_member_credit_limit: limit } as any)
+    .eq("id", workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as unknown as Workspace;
+}
+
 /**
  * Resolves which workspace a client-side action should use when there's no
  * explicit "current workspace" already in scope (e.g. remixing a shared

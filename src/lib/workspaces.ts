@@ -5,6 +5,9 @@ export interface Workspace {
   owner_id: string;
   plan: string;
   invite_code: string;
+  avatar_url: string | null;
+  handle: string | null;
+  default_member_credit_limit: number | null;
   created_at: string;
   updated_at: string;
 }

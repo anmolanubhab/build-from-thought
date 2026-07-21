@@ -600,7 +600,10 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          avatar_url: string | null
           created_at: string
+          default_member_credit_limit: number | null
+          handle: string | null
           id: string
           invite_code: string
           name: string
@@ -609,7 +612,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
+          default_member_credit_limit?: number | null
+          handle?: string | null
           id?: string
           invite_code?: string
           name: string
@@ -618,7 +624,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
+          default_member_credit_limit?: number | null
+          handle?: string | null
           id?: string
           invite_code?: string
           name?: string
@@ -636,7 +645,10 @@ export type Database = {
       create_workspace: {
         Args: { p_name: string }
         Returns: {
+          avatar_url: string | null
           created_at: string
+          default_member_credit_limit: number | null
+          handle: string | null
           id: string
           invite_code: string
           name: string
@@ -674,10 +686,18 @@ export type Database = {
           vercel_username: string
         }[]
       }
+      is_workspace_member: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
+      is_workspace_owner: { Args: { p_workspace_id: string }; Returns: boolean }
       join_workspace_by_code: {
         Args: { p_code: string }
         Returns: {
+          avatar_url: string | null
           created_at: string
+          default_member_credit_limit: number | null
+          handle: string | null
           id: string
           invite_code: string
           name: string
