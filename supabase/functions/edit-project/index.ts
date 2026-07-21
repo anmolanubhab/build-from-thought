@@ -1,4 +1,6 @@
+// path: supabase/functions/edit-project/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,29 +8,148 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+const GEMINI_MODEL = "gemini-3.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const ANTHROPIC_MODEL = "claude-opus-4-8";
+
+// Config files the editor must never touch — they're owned by the scaffold.
+const PROTECTED_PATHS = new Set([
+  "package.json",
+  "tsconfig.json",
+  "next.config.ts",
+  "postcss.config.mjs",
+  ".gitignore",
+]);
+
+class ProviderError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
   }
+}
 
+async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0.5 },
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("Gemini API error:", response.status, text);
+    throw new ProviderError(`Gemini API error: ${response.status}`, response.status);
+  }
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!content) throw new Error("No content in Gemini response");
+  return content;
+}
+
+async function generateWithClaude(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const client = new Anthropic({ apiKey });
+  const message = await client.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 32000,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const textBlock = message.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") throw new Error("No content in Claude response");
+  return textBlock.text;
+}
+
+function parseJSON(content: string): any {
   try {
-    const { prompt, currentHtml, currentCss, currentReactCode, mode } = await req.json();
-
-    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
-      return new Response(JSON.stringify({ error: "Prompt is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    return JSON.parse(content);
+  } catch {
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) return JSON.parse(jsonMatch[1].trim());
+    const braceStart = content.indexOf("{");
+    const braceEnd = content.lastIndexOf("}");
+    if (braceStart !== -1 && braceEnd !== -1) {
+      return JSON.parse(content.substring(braceStart, braceEnd + 1));
     }
+    throw new Error("Could not parse AI response as JSON");
+  }
+}
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+async function generateContent(
+  systemPrompt: string,
+  userPrompt: string,
+  geminiKey: string,
+  anthropicKey: string | undefined,
+): Promise<any> {
+  try {
+    return parseJSON(await generateWithGemini(geminiKey, systemPrompt, userPrompt));
+  } catch (geminiErr) {
+    const geminiMessage = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+    if (!anthropicKey) throw geminiErr;
+    console.error(`Gemini failed (${geminiMessage}) — falling back to Claude`);
+    try {
+      return parseJSON(await generateWithClaude(anthropicKey, systemPrompt, userPrompt));
+    } catch (claudeErr) {
+      const claudeMessage = claudeErr instanceof Error ? claudeErr.message : String(claudeErr);
+      const status = geminiErr instanceof ProviderError && geminiErr.status === 429 ? 429 : 502;
+      throw new ProviderError(
+        `Gemini failed (${geminiMessage}) and Claude fallback also failed (${claudeMessage})`,
+        status,
+      );
     }
+  }
+}
 
-    const applyMode = mode === "suggest" ? "suggestion" : "direct";
+// ---------------------------------------------------------------------------
 
-    const systemPrompt = `You are an expert web developer AI assistant. You are editing an existing web project.
+function modernEditSystemPrompt(files: Record<string, string>, mode: string): string {
+  const fileList = Object.keys(files).sort().join("\n");
+  const fileDump = Object.entries(files)
+    .filter(([path]) => !PROTECTED_PATHS.has(path))
+    .map(([path, content]) => `--- FILE: ${path} ---\n${content}`)
+    .join("\n\n");
+
+  return `You are a senior software engineer editing an EXISTING Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS v4 repository. You behave like an experienced engineer working in a real codebase: analyze first, then change ONLY what the request requires.
+
+PROJECT FILE TREE:
+${fileList}
+
+FILE CONTENTS (config files omitted — never modify package.json, tsconfig.json, next.config.ts, postcss.config.mjs, .gitignore):
+${fileDump}
+
+${mode === "suggestion" ? "The user wants a PROPOSAL: describe what you would change and provide the updated files." : "Apply the requested change directly."}
+
+You MUST respond with valid JSON only, with this exact structure:
+{
+  "summary": "One-sentence description of the change",
+  "changes": ["Specific change 1", "Specific change 2"],
+  "files": {
+    "components/hero.tsx": "FULL updated content of ONLY the files you changed or created"
+  },
+  "deleted_files": [],
+  "preview_html": "Updated self-contained static HTML approximation of the home page (body innerHTML only, no scripts)",
+  "preview_css": "Updated plain CSS for preview_html (NO Tailwind — the preview iframe has no build step)"
+}
+
+STRICT ENGINEERING RULES:
+- "files" contains ONLY files that actually change (or new files). Do NOT re-send unchanged files. Never rewrite unrelated files.
+- Return the FULL content of each changed file, not a diff.
+- Preserve the existing architecture, naming, component structure, and coding style exactly.
+- Keep components small and in their own files; create a new component file rather than bloating an existing one.
+- Server Components by default; "use client" only where hooks/events/browser APIs are used.
+- Use the existing design tokens (bg-background, text-foreground, bg-primary, text-muted-foreground, border-border, etc.) and existing ui primitives from components/ui/.
+- Only import packages already imported somewhere in the project, plus lucide-react.
+- Maintain accessibility (semantic HTML, aria-labels, focus states) and responsiveness.
+- "deleted_files" lists paths that should be removed (rarely needed — only when the request demands it). Never delete config files.
+- Update preview_html/preview_css so the static preview matches the changed app. If the change doesn't affect the home page's appearance, return the previous preview unchanged.
+- No obvious runtime errors, no missing imports, no unused code. Mentally verify TypeScript would compile before answering.`;
+}
+
+function legacyEditSystemPrompt(currentHtml: string, currentCss: string, currentReactCode: string, mode: string): string {
+  return `You are an expert web developer AI assistant. You are editing an existing web project.
 
 Current project code:
 --- HTML ---
@@ -38,9 +159,9 @@ ${currentCss || ""}
 --- React Code ---
 ${currentReactCode || ""}
 
-The user wants to make changes. ${applyMode === "suggestion" ? "Provide a description of what you would change, then the updated code." : "Apply the changes directly."}
+The user wants to make changes. ${mode === "suggestion" ? "Provide a description of what you would change, then the updated code." : "Apply the changes directly."}
 
-You MUST respond with valid JSON only, no markdown, no explanation. The JSON must have this exact structure:
+You MUST respond with valid JSON only. The JSON must have this exact structure:
 {
   "summary": "Brief description of changes made",
   "html": "Updated complete HTML content (body inner HTML only)",
@@ -56,64 +177,110 @@ Rules:
 - Do NOT include script tags in HTML
 - Do NOT include import statements in HTML
 - Return the FULL updated code, not just the diff`;
+}
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: prompt.trim() },
-        ],
-        stream: false,
-      }),
-    });
+// ---------------------------------------------------------------------------
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429,
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { prompt, currentHtml, currentCss, currentReactCode, files, mode } = await req.json();
+
+    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "Prompt is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+
+    const applyMode = mode === "suggest" ? "suggestion" : "direct";
+    const isModern = files && typeof files === "object" && !Array.isArray(files) && Object.keys(files).length > 0;
+
+    // =====================================================================
+    // Modern file-aware editing
+    // =====================================================================
+    if (isModern) {
+      let parsed;
+      try {
+        parsed = await generateContent(
+          modernEditSystemPrompt(files, applyMode),
+          prompt.trim(),
+          GEMINI_API_KEY,
+          ANTHROPIC_API_KEY,
+        );
+      } catch (err) {
+        const status = err instanceof ProviderError ? err.status : 502;
+        const message = status === 429
+          ? "Rate limit exceeded. Please try again in a moment."
+          : err instanceof Error ? err.message : "AI edit failed";
+        return new Response(JSON.stringify({ error: message }), {
+          status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
-      throw new Error(`AI gateway error: ${response.status}`);
-    }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("No content in AI response");
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[1].trim());
-      } else {
-        const braceStart = content.indexOf("{");
-        const braceEnd = content.lastIndexOf("}");
-        if (braceStart !== -1 && braceEnd !== -1) {
-          parsed = JSON.parse(content.substring(braceStart, braceEnd + 1));
-        } else {
-          throw new Error("Could not parse AI response as JSON");
+      const changedFiles: Record<string, string> = {};
+      if (parsed.files && typeof parsed.files === "object" && !Array.isArray(parsed.files)) {
+        for (const [path, content] of Object.entries(parsed.files)) {
+          const normalized = String(path).replace(/^\/+/, "");
+          if (PROTECTED_PATHS.has(normalized)) continue;
+          if (typeof content === "string") changedFiles[normalized] = content;
         }
       }
+
+      const deletedFiles: string[] = Array.isArray(parsed.deleted_files)
+        ? parsed.deleted_files
+            .map((p: unknown) => String(p).replace(/^\/+/, ""))
+            .filter((p: string) => !PROTECTED_PATHS.has(p))
+        : [];
+
+      // Merge server-side so the client gets a consistent full map back.
+      const mergedFiles: Record<string, string> = { ...files, ...changedFiles };
+      for (const path of deletedFiles) delete mergedFiles[path];
+
+      const result = {
+        summary: parsed.summary || "Changes applied",
+        changes: Array.isArray(parsed.changes) && parsed.changes.length > 0 ? parsed.changes : ["Code updated"],
+        html: typeof parsed.preview_html === "string" && parsed.preview_html ? parsed.preview_html : (currentHtml || ""),
+        css: typeof parsed.preview_css === "string" && parsed.preview_css ? parsed.preview_css : (currentCss || ""),
+        react_code: mergedFiles["app/page.tsx"] || currentReactCode || "",
+        files: mergedFiles,
+        changed_paths: [...Object.keys(changedFiles), ...deletedFiles.map((p) => `deleted: ${p}`)],
+      };
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // =====================================================================
+    // Legacy html/css editing (old static projects)
+    // =====================================================================
+    let parsed;
+    try {
+      parsed = await generateContent(
+        legacyEditSystemPrompt(currentHtml, currentCss, currentReactCode, applyMode),
+        prompt.trim(),
+        GEMINI_API_KEY,
+        ANTHROPIC_API_KEY,
+      );
+    } catch (err) {
+      const status = err instanceof ProviderError ? err.status : 502;
+      const message = status === 429
+        ? "Rate limit exceeded. Please try again in a moment."
+        : err instanceof Error ? err.message : "AI edit failed";
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const result = {
@@ -122,6 +289,8 @@ Rules:
       css: parsed.css || currentCss,
       react_code: parsed.react_code || currentReactCode,
       changes: parsed.changes || ["Code updated"],
+      files: null,
+      changed_paths: [],
     };
 
     return new Response(JSON.stringify(result), {
@@ -132,10 +301,7 @@ Rules:
     console.error("edit-project error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

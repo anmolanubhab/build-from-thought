@@ -7,6 +7,9 @@ export interface PageData {
   html: string;
 }
 
+/** Map of "path/in/project" -> file content for modern (Next.js) projects. */
+export type ProjectFiles = Record<string, string>;
+
 export interface Project {
   id: string;
   user_id: string;
@@ -22,8 +25,15 @@ export interface Project {
   is_starred: boolean;
   is_multipage: boolean;
   pages?: PageData[] | null;
+  files?: ProjectFiles | null;
+  stack?: string;
   view_count: number;
   created_at: string;
+}
+
+/** True when the project carries a full modern (Next.js) file map. */
+export function isModernProject(project: Pick<Project, "files">): boolean {
+  return !!project.files && Object.keys(project.files).length > 0;
 }
 
 export function generateSlug(title: string): string {

@@ -321,6 +321,7 @@ export type Database = {
           code: string | null
           created_at: string
           css: string | null
+          files: Json | null
           html: string | null
           id: string
           pages: Json | null
@@ -336,6 +337,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           css?: string | null
+          files?: Json | null
           html?: string | null
           id?: string
           pages?: Json | null
@@ -351,6 +353,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           css?: string | null
+          files?: Json | null
           html?: string | null
           id?: string
           pages?: Json | null
@@ -377,6 +380,7 @@ export type Database = {
           created_at: string
           css: string | null
           deployed_url: string | null
+          files: Json | null
           html: string | null
           id: string
           is_multipage: boolean
@@ -386,6 +390,7 @@ export type Database = {
           prompt: string
           react_code: string | null
           slug: string
+          stack: string
           title: string
           type: string
           updated_at: string
@@ -397,6 +402,7 @@ export type Database = {
           created_at?: string
           css?: string | null
           deployed_url?: string | null
+          files?: Json | null
           html?: string | null
           id?: string
           is_multipage?: boolean
@@ -406,6 +412,7 @@ export type Database = {
           prompt: string
           react_code?: string | null
           slug: string
+          stack?: string
           title: string
           type?: string
           updated_at?: string
@@ -417,6 +424,7 @@ export type Database = {
           created_at?: string
           css?: string | null
           deployed_url?: string | null
+          files?: Json | null
           html?: string | null
           id?: string
           is_multipage?: boolean
@@ -426,6 +434,7 @@ export type Database = {
           prompt?: string
           react_code?: string | null
           slug?: string
+          stack?: string
           title?: string
           type?: string
           updated_at?: string

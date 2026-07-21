@@ -22,6 +22,7 @@ interface ProjectSnapshot {
   css: string;
   react_code: string;
   pages?: PageData[] | null;
+  files?: Record<string, string> | null;
 }
 
 /** Short ascending two-tone chime, synthesized client-side so no audio asset is needed. */
@@ -103,14 +104,14 @@ export default function Editor() {
       }
       const loaded = data as unknown as Project;
       setProject(loaded);
-      setLiveSnapshot({ html: loaded.html || "", css: loaded.css || "", react_code: loaded.react_code || "", pages: loaded.pages });
+      setLiveSnapshot({ html: loaded.html || "", css: loaded.css || "", react_code: loaded.react_code || "", pages: loaded.pages, files: loaded.files ?? null });
 
       // Resume an in-progress draft, if one exists, so a refresh doesn't lose it.
       try {
         const openDraft = await fetchOpenDraft(id);
         if (openDraft) {
           setDraft(openDraft);
-          setProject((prev) => prev ? { ...prev, html: openDraft.html || "", css: openDraft.css || "", react_code: openDraft.react_code || "", pages: openDraft.pages } : prev);
+          setProject((prev) => prev ? { ...prev, html: openDraft.html || "", css: openDraft.css || "", react_code: openDraft.react_code || "", pages: openDraft.pages, files: openDraft.files ?? prev.files } : prev);
         }
       } catch (err) {
         console.error("Failed to load open draft:", err);
@@ -121,13 +122,13 @@ export default function Editor() {
   }, [id, user, navigate]);
 
   const saveDraft = useCallback(
-    async (html: string, css: string, react_code: string, pages: PageData[] | null | undefined, summary: string) => {
+    async (html: string, css: string, react_code: string, pages: PageData[] | null | undefined, summary: string, files?: Record<string, string> | null) => {
       if (!id) return;
       if (draft) {
-        const updated = await updateDraft(draft.id, { html, css, react_code, pages }, summary);
+        const updated = await updateDraft(draft.id, { html, css, react_code, pages, files }, summary);
         setDraft(updated);
       } else {
-        const created = await createDraft(id, { html, css, react_code, pages }, summary);
+        const created = await createDraft(id, { html, css, react_code, pages, files }, summary);
         setDraft(created);
       }
     },
@@ -148,7 +149,8 @@ export default function Editor() {
         project.html || "",
         project.css || "",
         project.react_code || "",
-        mode
+        mode,
+        project.files ?? null
       );
 
       if (mode === "suggest") {
@@ -158,12 +160,13 @@ export default function Editor() {
       } else {
         setUndoStack((prev) => [
           ...prev,
-          { html: project.html || "", css: project.css || "", react_code: project.react_code || "", pages: project.pages },
+          { html: project.html || "", css: project.css || "", react_code: project.react_code || "", pages: project.pages, files: project.files ?? null },
         ]);
 
-        const updated: Project = { ...project, html: result.html, css: result.css, react_code: result.react_code };
+        const nextFiles = result.files ?? project.files ?? null;
+        const updated: Project = { ...project, html: result.html, css: result.css, react_code: result.react_code, files: nextFiles };
         setProject(updated);
-        await saveDraft(result.html, result.css, result.react_code, project.pages, result.summary || prompt);
+        await saveDraft(result.html, result.css, result.react_code, project.pages, result.summary || prompt, nextFiles);
 
         setHistory((prev) => prev.map((e) => e.id === entryId ? { ...e, status: "success", summary: result.summary, changes: result.changes } : e));
         toast({ title: "Draft updated", description: "Preview or publish when you're ready." });
@@ -182,9 +185,9 @@ export default function Editor() {
     const prev = undoStack[undoStack.length - 1];
     setUndoStack((s) => s.slice(0, -1));
 
-    const updated: Project = { ...project, html: prev.html, css: prev.css, react_code: prev.react_code, pages: prev.pages };
+    const updated: Project = { ...project, html: prev.html, css: prev.css, react_code: prev.react_code, pages: prev.pages, files: prev.files ?? null };
     setProject(updated);
-    await saveDraft(prev.html, prev.css, prev.react_code, prev.pages, "Undo");
+    await saveDraft(prev.html, prev.css, prev.react_code, prev.pages, "Undo", prev.files ?? null);
     toast({ title: "Change undone" });
   };
 
@@ -192,12 +195,13 @@ export default function Editor() {
     if (!previewChanges || !project) return;
     setUndoStack((prev) => [
       ...prev,
-      { html: project.html || "", css: project.css || "", react_code: project.react_code || "", pages: project.pages },
+      { html: project.html || "", css: project.css || "", react_code: project.react_code || "", pages: project.pages, files: project.files ?? null },
     ]);
 
-    const updated: Project = { ...project, html: previewChanges.html, css: previewChanges.css, react_code: previewChanges.react_code };
+    const nextFiles = previewChanges.files ?? project.files ?? null;
+    const updated: Project = { ...project, html: previewChanges.html, css: previewChanges.css, react_code: previewChanges.react_code, files: nextFiles };
     setProject(updated);
-    await saveDraft(previewChanges.html, previewChanges.css, previewChanges.react_code, project.pages, previewChanges.summary);
+    await saveDraft(previewChanges.html, previewChanges.css, previewChanges.react_code, project.pages, previewChanges.summary, nextFiles);
     setPreviewChanges(null);
     toast({ title: "Draft updated", description: previewChanges.summary });
   };
@@ -207,7 +211,7 @@ export default function Editor() {
     setPublishing(true);
     try {
       await publishVersion(draft.id);
-      setLiveSnapshot({ html: draft.html || "", css: draft.css || "", react_code: draft.react_code || "", pages: draft.pages });
+      setLiveSnapshot({ html: draft.html || "", css: draft.css || "", react_code: draft.react_code || "", pages: draft.pages, files: draft.files ?? null });
       setDraft(null);
       toast({ title: "Published!", description: "Your changes are now live." });
     } catch (err) {
@@ -252,7 +256,7 @@ export default function Editor() {
     if (data) {
       const reloaded = data as unknown as Project;
       setProject(reloaded);
-      setLiveSnapshot({ html: reloaded.html || "", css: reloaded.css || "", react_code: reloaded.react_code || "", pages: reloaded.pages });
+      setLiveSnapshot({ html: reloaded.html || "", css: reloaded.css || "", react_code: reloaded.react_code || "", pages: reloaded.pages, files: reloaded.files ?? null });
       setDraft(null);
     }
   };
@@ -334,11 +338,13 @@ export default function Editor() {
             css={project.css || ""}
             title={project.title}
             pages={pages}
+            files={project.files ?? null}
             previewChanges={previewChanges ? {
               summary: previewChanges.summary,
               changes: previewChanges.changes,
               html: previewChanges.html,
               css: previewChanges.css,
+              files: previewChanges.files ?? null,
             } : null}
             onAcceptPreview={handleAcceptPreview}
             onRejectPreview={() => setPreviewChanges(null)}

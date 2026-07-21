@@ -121,6 +121,8 @@ const Dashboard = () => {
         react_code: result.react_code,
         is_multipage: result.is_multipage ?? isMultipage,
         pages: result.pages ?? null,
+        files: result.files ?? null,
+        stack: result.stack ?? "static",
       });
       setProjects((prev) => [newProject, ...prev]);
       setPrompt("");
@@ -132,6 +134,7 @@ const Dashboard = () => {
         css: newProject.css || "",
         react_code: newProject.react_code || "",
         pages: newProject.pages,
+        files: newProject.files ?? null,
       }).catch((err) => console.error("Failed to create baseline version:", err));
       toast({ title: "App generated!", description: `"${newProject.title}" is ready.` });
     } catch (err) {

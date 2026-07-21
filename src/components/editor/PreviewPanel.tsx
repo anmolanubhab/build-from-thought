@@ -8,7 +8,9 @@ interface PreviewPanelProps {
   css: string;
   title: string;
   pages?: PageData[];
-  previewChanges?: { summary: string; changes: string[]; html: string; css: string; pages?: PageData[] } | null;
+  /** Full Next.js file map for modern projects — enables the file browser in Code view. */
+  files?: Record<string, string> | null;
+  previewChanges?: { summary: string; changes: string[]; html: string; css: string; pages?: PageData[]; files?: Record<string, string> | null } | null;
   onAcceptPreview?: () => void;
   onRejectPreview?: () => void;
 }
@@ -23,16 +25,25 @@ const DEVICE_WIDTHS: Record<DeviceMode, string> = {
 };
 
 export default function PreviewPanel({
-  html, css, title, pages, previewChanges, onAcceptPreview, onRejectPreview,
+  html, css, title, pages, files, previewChanges, onAcceptPreview, onRejectPreview,
 }: PreviewPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [activePage, setActivePage] = useState(0);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
 
   // Determine which pages to show
   const displayPages = previewChanges?.pages ?? pages ?? [{ name: "index", title: "Home", html: html }];
   const displayCss = previewChanges?.css ?? css;
   const isMultipage = displayPages.length > 1;
+
+  // Modern projects: full file map for the Code view
+  const displayFiles = previewChanges?.files ?? files ?? null;
+  const filePaths = displayFiles ? Object.keys(displayFiles).sort() : [];
+  const isModern = filePaths.length > 0;
+  const currentFile = activeFile && displayFiles?.[activeFile] !== undefined
+    ? activeFile
+    : (filePaths.includes("app/page.tsx") ? "app/page.tsx" : filePaths[0] ?? null);
 
   // Clamp active page
   const currentPageIndex = Math.min(activePage, displayPages.length - 1);
@@ -158,6 +169,39 @@ export default function PreviewPanel({
               title="Project preview"
               sandbox="allow-scripts"
             />
+          </div>
+        ) : isModern ? (
+          <div className="w-full h-full flex gap-3">
+            {/* File tree */}
+            <div className="w-56 shrink-0 bg-white rounded-xl border border-gray-200 overflow-y-auto">
+              <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                Project files ({filePaths.length})
+              </p>
+              <div className="pb-2">
+                {filePaths.map((path) => (
+                  <button
+                    key={path}
+                    onClick={() => setActiveFile(path)}
+                    className={cn(
+                      "w-full text-left px-3 py-1.5 text-xs font-mono truncate transition-colors",
+                      currentFile === path
+                        ? "bg-gray-100 text-gray-900 font-medium"
+                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                    )}
+                    title={path}
+                  >
+                    {path}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* File content */}
+            <div className="flex-1 min-w-0 flex flex-col">
+              <p className="text-xs font-mono text-gray-500 mb-2 px-1 truncate">{currentFile}</p>
+              <pre className="flex-1 bg-gray-900 text-gray-100 rounded-xl p-4 text-xs overflow-auto font-mono leading-relaxed">
+                {(currentFile && displayFiles?.[currentFile]) || "// Empty file"}
+              </pre>
+            </div>
           </div>
         ) : (
           <div className="w-full max-w-4xl space-y-4">

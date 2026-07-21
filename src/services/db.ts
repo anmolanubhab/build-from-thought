@@ -26,6 +26,8 @@ export async function insertProject(project: {
   react_code?: string;
   is_multipage?: boolean;
   pages?: PageData[] | null;
+  files?: Record<string, string> | null;
+  stack?: string;
 }): Promise<Project> {
   const { data, error } = await supabase
     .from("projects")
@@ -125,5 +127,7 @@ export async function remixProject(originalProject: Project, newUserId: string, 
     react_code: originalProject.react_code,
     is_multipage: originalProject.is_multipage,
     pages: originalProject.pages,
+    files: originalProject.files ?? null,
+    stack: originalProject.stack ?? "static",
   });
 }

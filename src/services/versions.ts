@@ -11,6 +11,7 @@ export interface ProjectVersion {
   css: string | null;
   react_code: string | null;
   pages: PageData[] | null;
+  files: Record<string, string> | null;
   preview_url: string | null;
   summary: string | null;
   published_at: string | null;
@@ -22,6 +23,7 @@ export interface VersionContent {
   css: string;
   react_code: string;
   pages?: PageData[] | null;
+  files?: Record<string, string> | null;
 }
 
 /** Creates the initial "live" version snapshot right after a project is first generated. */
@@ -36,6 +38,7 @@ export async function createBaselineVersion(projectId: string, content: VersionC
       css: content.css,
       react_code: content.react_code,
       pages: (content.pages ?? null) as any,
+      files: (content.files ?? null) as any,
       published_at: new Date().toISOString(),
       summary: "Initial generation",
     } as any)
@@ -81,6 +84,7 @@ export async function createDraft(projectId: string, content: VersionContent, su
       css: content.css,
       react_code: content.react_code,
       pages: (content.pages ?? null) as any,
+      files: (content.files ?? null) as any,
       summary,
     } as any)
     .select()
@@ -98,6 +102,7 @@ export async function updateDraft(versionId: string, content: VersionContent, su
       css: content.css,
       react_code: content.react_code,
       pages: (content.pages ?? null) as any,
+      files: (content.files ?? null) as any,
       summary,
     } as any)
     .eq("id", versionId)

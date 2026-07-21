@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk";
+import { buildProjectFiles, DEPENDENCY_ALLOWLIST } from "./scaffold.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,58 +15,132 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 const ANTHROPIC_MODEL = "claude-opus-4-8";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-const PROMPT_ENHANCERS: Record<string, string> = {
-  portfolio:
-    "Create a modern, responsive portfolio website with a hero section featuring the developer's name and title, a projects grid with card components, a skills section, and a contact form. Use a dark theme with accent colors.",
-  dashboard:
-    "Create a professional admin dashboard with a sidebar navigation, stat cards showing KPIs (users, revenue, growth), a data table, and a chart section. Use a dark theme with clean typography.",
-  landing:
-    "Create a modern SaaS landing page with a hero section with headline and CTA button, a features grid, pricing cards, testimonials, and a footer. Use a dark gradient theme.",
-  generic:
-    "Create a clean, modern single-page web application with a header, main content area, and footer. Use a dark theme with good spacing and typography.",
+// ---------------------------------------------------------------------------
+// Template guidance — richer briefs per detected project category.
+// The DB `type` column keeps the legacy 4-value union for frontend compat.
+// ---------------------------------------------------------------------------
+
+interface Template {
+  legacyType: "portfolio" | "dashboard" | "landing" | "generic";
+  brief: string;
+}
+
+const TEMPLATES: Record<string, Template> = {
+  portfolio: {
+    legacyType: "portfolio",
+    brief:
+      "A personal portfolio: hero with name/role and CTA, selected projects grid with cards, skills, about, contact section. Components: navbar, hero, projects, skills, about, contact, footer.",
+  },
+  dashboard: {
+    legacyType: "dashboard",
+    brief:
+      "An admin dashboard: collapsible sidebar navigation, top header with search and user menu, KPI stat cards row, charts section (Recharts), recent-activity data table. Components: sidebar, header, stat-cards, charts, data-table.",
+  },
+  analytics: {
+    legacyType: "dashboard",
+    brief:
+      "An analytics dashboard: KPI tiles with trend deltas, line/area charts over time (Recharts), a breakdown bar chart, top-items table, date-range selector in the header.",
+  },
+  crm: {
+    legacyType: "dashboard",
+    brief:
+      "A CRM: sidebar, contacts/leads table with status badges and search, pipeline summary cards, lead detail side panel, activity timeline.",
+  },
+  erp: {
+    legacyType: "dashboard",
+    brief:
+      "An ERP overview: sidebar with modules (inventory, orders, finance, HR), KPI cards, inventory table with stock-level badges, orders table, simple finance chart.",
+  },
+  invoice: {
+    legacyType: "dashboard",
+    brief:
+      "An invoice system: invoices table with status badges (paid/pending/overdue), summary cards for totals, invoice detail view with line items, create-invoice form using react-hook-form + zod.",
+  },
+  booking: {
+    legacyType: "dashboard",
+    brief:
+      "A booking system: service/slot cards, a booking form with date selection (date-fns) and validation (react-hook-form + zod), upcoming bookings list, confirmation state.",
+  },
+  chat: {
+    legacyType: "generic",
+    brief:
+      "An AI chat interface: sidebar with conversation list, message thread with user/assistant bubbles, streaming-style typing indicator, composer with textarea and send button, empty state with suggested prompts.",
+  },
+  ecommerce: {
+    legacyType: "landing",
+    brief:
+      "An e-commerce storefront: promo hero, product grid with cards (image placeholder, price, rating), category filter chips, cart drawer/summary component, footer with links.",
+  },
+  blog: {
+    legacyType: "generic",
+    brief:
+      "A blog: featured-post hero, posts grid with cards (cover placeholder, tag, date via date-fns, excerpt), tag filter, newsletter signup section, footer.",
+  },
+  saas: {
+    legacyType: "landing",
+    brief:
+      "A SaaS landing page: sticky navbar, hero with headline + CTA, logos strip, features grid, product screenshot section, pricing tiers, testimonials, FAQ accordion, footer.",
+  },
+  landing: {
+    legacyType: "landing",
+    brief:
+      "A modern landing page: sticky navbar, hero with headline and CTA, features grid, testimonials, pricing, FAQ, footer. Smooth entrance animations with framer-motion.",
+  },
+  hospital: {
+    legacyType: "landing",
+    brief:
+      "A hospital/clinic site: hero with appointment CTA, departments/services grid, doctors cards, appointment request form (react-hook-form + zod), contact/hours section, footer.",
+  },
+  school: {
+    legacyType: "landing",
+    brief:
+      "A school website: hero, programs/courses grid, faculty highlights, admissions steps section, testimonials, enquiry form with validation, footer.",
+  },
+  restaurant: {
+    legacyType: "landing",
+    brief:
+      "A restaurant site: hero with reservation CTA, menu sections with dish cards and prices, gallery grid, opening hours + location, reservation form with validation, footer.",
+  },
+  finance: {
+    legacyType: "dashboard",
+    brief:
+      "A finance dashboard: balance/spend KPI cards, portfolio or cash-flow chart (Recharts), transactions table with category badges, budgets progress section.",
+  },
 };
 
-function detectType(prompt: string): string {
+function detectTemplate(prompt: string): { key: string; template: Template } {
   const lower = prompt.toLowerCase();
-  if (lower.includes("portfolio")) return "portfolio";
-  if (lower.includes("dashboard") || lower.includes("admin") || lower.includes("analytics")) return "dashboard";
-  if (lower.includes("landing") || lower.includes("startup") || lower.includes("saas")) return "landing";
-  return "generic";
-}
-
-function detectMultipageHint(prompt: string): string[] {
-  const lower = prompt.toLowerCase();
-  const pages: string[] = ["index"];
-  if (lower.includes("about")) pages.push("about");
-  if (lower.includes("contact")) pages.push("contact");
-  if (lower.includes("service")) pages.push("services");
-  if (lower.includes("blog")) pages.push("blog");
-  if (lower.includes("team")) pages.push("team");
-  if (lower.includes("pricing")) pages.push("pricing");
-  if (lower.includes("faq")) pages.push("faq");
-  if (pages.length === 1) {
-    pages.push("about", "contact");
+  const checks: [string, string[]][] = [
+    ["portfolio", ["portfolio"]],
+    ["crm", ["crm", "lead", "sales pipeline"]],
+    ["erp", ["erp"]],
+    ["invoice", ["invoice", "billing"]],
+    ["booking", ["booking", "appointment", "reservation system"]],
+    ["chat", ["chat", "chatbot", "ai assistant"]],
+    ["ecommerce", ["e-commerce", "ecommerce", "shop", "store", "product catalog"]],
+    ["blog", ["blog", "articles", "magazine"]],
+    ["hospital", ["hospital", "clinic", "medical", "doctor"]],
+    ["school", ["school", "college", "university", "academy"]],
+    ["restaurant", ["restaurant", "cafe", "food menu"]],
+    ["finance", ["finance", "banking", "budget", "expense"]],
+    ["analytics", ["analytics"]],
+    ["dashboard", ["dashboard", "admin"]],
+    ["saas", ["saas"]],
+    ["landing", ["landing", "startup", "homepage"]],
+  ];
+  for (const [key, words] of checks) {
+    if (words.some((w) => lower.includes(w))) return { key, template: TEMPLATES[key] };
   }
-  return pages;
+  return {
+    key: "landing",
+    template: { legacyType: "generic", brief: TEMPLATES.landing.brief },
+  };
 }
 
-async function callGemini(apiKey: string, systemPrompt: string, userPrompt: string) {
-  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.7,
-      },
-    }),
-  });
-  return response;
-}
+// ---------------------------------------------------------------------------
+// Providers: Gemini primary, Claude fallback.
+// ---------------------------------------------------------------------------
 
-/** Carries the upstream HTTP status so a Gemini rate-limit can still be reported after a fallback attempt. */
 class ProviderError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -74,9 +149,16 @@ class ProviderError extends Error {
   }
 }
 
-/** Gemini is the primary provider. Throws with a descriptive message on any failure. */
 async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await callGemini(apiKey, systemPrompt, userPrompt);
+  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0.7 },
+    }),
+  });
   if (!response.ok) {
     const text = await response.text();
     console.error("Gemini API error:", response.status, text);
@@ -88,12 +170,11 @@ async function generateWithGemini(apiKey: string, systemPrompt: string, userProm
   return content;
 }
 
-/** Claude is the fallback provider, used only when Gemini fails and an Anthropic key is configured. */
 async function generateWithClaude(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
   const client = new Anthropic({ apiKey });
   const message = await client.messages.create({
     model: ANTHROPIC_MODEL,
-    max_tokens: 16000,
+    max_tokens: 32000,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -102,12 +183,21 @@ async function generateWithClaude(apiKey: string, systemPrompt: string, userProm
   return textBlock.text;
 }
 
-/**
- * Tries Gemini first; falls back to Claude only on a Gemini failure — including
- * a response that doesn't parse as JSON — and only if ANTHROPIC_API_KEY is
- * configured. Returns the already-parsed JSON so callers don't need to
- * re-parse (and can't accidentally skip the fallback on a parse failure).
- */
+function parseJSON(content: string): any {
+  try {
+    return JSON.parse(content);
+  } catch {
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) return JSON.parse(jsonMatch[1].trim());
+    const braceStart = content.indexOf("{");
+    const braceEnd = content.lastIndexOf("}");
+    if (braceStart !== -1 && braceEnd !== -1) {
+      return JSON.parse(content.substring(braceStart, braceEnd + 1));
+    }
+    throw new Error("Could not parse AI response as JSON");
+  }
+}
+
 async function generateContent(
   systemPrompt: string,
   userPrompt: string,
@@ -120,7 +210,6 @@ async function generateContent(
   } catch (geminiErr) {
     const geminiMessage = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
     if (!anthropicKey) throw geminiErr;
-
     console.error(`Gemini failed (${geminiMessage}) — falling back to Claude`);
     try {
       const content = await generateWithClaude(anthropicKey, systemPrompt, userPrompt);
@@ -128,121 +217,86 @@ async function generateContent(
     } catch (claudeErr) {
       const claudeMessage = claudeErr instanceof Error ? claudeErr.message : String(claudeErr);
       console.error("Claude fallback also failed:", claudeMessage);
-      const combinedMessage = `Gemini failed (${geminiMessage}) and Claude fallback also failed (${claudeMessage})`;
-      // Preserve a 429 signal from Gemini so the client still knows to retry later.
       const status = geminiErr instanceof ProviderError && geminiErr.status === 429 ? 429 : 502;
-      throw new ProviderError(combinedMessage, status);
-    }
-  }
-}
-
-function parseJSON(content: string): any {
-  try {
-    return JSON.parse(content);
-  } catch {
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[1].trim());
-    }
-    const braceStart = content.indexOf("{");
-    const braceEnd = content.lastIndexOf("}");
-    if (braceStart !== -1 && braceEnd !== -1) {
-      return JSON.parse(content.substring(braceStart, braceEnd + 1));
-    }
-    throw new Error("Could not parse AI response as JSON");
-  }
-}
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    // --- Auth: require a logged-in user (also stops anonymous credit/cost abuse) ---
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { prompt, is_multipage } = await req.json();
-    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
-      return new Response(JSON.stringify({ error: "Prompt is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured");
-    }
-    // Optional — enables an automatic Claude fallback when Gemini fails.
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-
-    // --- Credits: fetch, reset if a day has passed, and check balance ---
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("credits_remaining, credits_daily_limit, credits_reset_at")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      throw new Error("Could not load profile credits");
-    }
-
-    let creditsRemaining = profile.credits_remaining;
-    const dailyLimit = profile.credits_daily_limit ?? 5;
-    const resetAt = new Date(profile.credits_reset_at).getTime();
-    const shouldReset = Date.now() - resetAt >= ONE_DAY_MS;
-
-    if (shouldReset) {
-      creditsRemaining = dailyLimit;
-    }
-
-    if (creditsRemaining <= 0) {
-      return new Response(
-        JSON.stringify({ error: "You're out of daily credits. They reset every 24 hours." }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      throw new ProviderError(
+        `Gemini failed (${geminiMessage}) and Claude fallback also failed (${claudeMessage})`,
+        status,
       );
     }
+  }
+}
 
-    const newCredits = creditsRemaining - 1;
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        credits_remaining: newCredits,
-        ...(shouldReset ? { credits_reset_at: new Date().toISOString() } : {}),
-      })
-      .eq("id", user.id);
+// ---------------------------------------------------------------------------
+// Modern (Next.js 15) system prompt
+// ---------------------------------------------------------------------------
 
-    if (updateError) {
-      console.error("Failed to update credits:", updateError.message);
-    }
+function modernSystemPrompt(templateBrief: string, multiRoute: boolean): string {
+  const allowedDeps = Object.keys(DEPENDENCY_ALLOWLIST).join(", ");
+  return `You are a senior full-stack engineer generating a production-ready Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS v4 application.
 
-    const type = detectType(prompt);
-    const isMultipage = is_multipage !== false;
+A scaffold ALREADY EXISTS — do NOT generate these files (they are provided): package.json, tsconfig.json, next.config.ts, postcss.config.mjs, app/globals.css, lib/utils.ts (exports cn()), components/ui/button.tsx (Button with variants default/outline/secondary/ghost/destructive/link and sizes sm/default/lg/icon), components/ui/card.tsx (Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter), components/ui/input.tsx (Input), components/ui/badge.tsx (Badge). Import them via the "@/" alias, e.g. import { Button } from "@/components/ui/button".
 
-    if (!isMultipage) {
-      const enhancedPrompt = `${PROMPT_ENHANCERS[type]} The user's specific request: "${prompt.trim()}"`;
-      const systemPrompt = `You are an expert web developer. Generate a complete single-page website based on the user's description.
+app/globals.css defines shadcn-style design tokens usable as Tailwind classes: bg-background, text-foreground, bg-card, text-card-foreground, bg-primary, text-primary-foreground, bg-secondary, bg-muted, text-muted-foreground, bg-accent, text-destructive, border-border, ring-ring, rounded-lg (radius tokens). Dark mode works via the "dark" class. ALWAYS use these tokens — never hardcode hex colors except for decorative gradients.
+
+Project brief for this category: ${templateBrief}
+
+You MUST respond with valid JSON only, with this exact structure:
+{
+  "title": "Short product-style title",
+  "description": "One-sentence description used for metadata",
+  "dependencies": ["framer-motion"],
+  "files": {
+    "app/page.tsx": "...",
+    "components/navbar.tsx": "...",
+    "components/hero.tsx": "..."
+  },
+  "preview_html": "Self-contained static HTML approximation of the home page (body innerHTML only, no scripts)",
+  "preview_css": "Plain CSS for preview_html (NO Tailwind — the preview iframe has no build step)"
+}
+
+ARCHITECTURE RULES (strict):
+- TypeScript only. Every component in its own file. NEVER one huge page file.
+- app/page.tsx composes section components imported from components/ (e.g. <Navbar />, <Hero />, <Features />). Keep page files under ~60 lines.
+- Server Components by default; add "use client" ONLY to files that use hooks, event handlers, framer-motion, or browser APIs.
+- Folder conventions: app/ (routes), components/ (sections & shared), components/ui/ (primitives), lib/ (utilities), types/ (shared types when needed). No other top-level folders.
+${multiRoute ? '- Create additional routes as app/<route>/page.tsx (e.g. app/about/page.tsx) with a shared navbar component linking them via next/link.' : "- Single route only: app/page.tsx."}
+- "dependencies": list ONLY packages you actually import, chosen from: ${allowedDeps}. Icons come from lucide-react (already installed). Do not list anything else.
+- Use next/link for navigation. Do NOT use react-router, Bootstrap, jQuery, Material UI, class components, or inline style objects (except dynamic values like chart dimensions).
+
+QUALITY RULES:
+- Responsive at mobile/tablet/desktop (Tailwind sm/md/lg breakpoints). Mobile navbar collapses to a menu button.
+- Accessible: semantic HTML (header/nav/main/section/footer), aria-labels on icon-only buttons, alt text, visible focus states, label htmlFor on inputs.
+- Realistic, specific placeholder content — real-sounding names, numbers, copy. Never lorem ipsum.
+- Include hover states, empty states where lists could be empty, and loading/disabled states on submit buttons.
+- Forms use react-hook-form + zod with @hookform/resolvers when the app has a form.
+- Charts use recharts inside a "use client" component.
+- Polished modern aesthetic: generous whitespace, consistent spacing scale, subtle borders, restrained color; quality bar of Linear/Stripe/Vercel marketing pages. Do not copy any real product's content.
+
+PREVIEW RULES:
+- preview_html/preview_css visually approximate the FINAL rendered home page (same layout, colors, text) as static HTML with plain CSS.
+- Dark or light per what suits the app; make it look identical in spirit to the React version.
+- No <script>, no <html>/<head>/<body> wrappers, no external assets. Use CSS gradients/solid colors instead of images.
+
+Escape all JSON string content correctly. Keep total output focused: 4-10 component files of clean code beat 20 bloated ones.`;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy static system prompts (kept for stack: "static" requests)
+// ---------------------------------------------------------------------------
+
+const LEGACY_ENHANCERS: Record<string, string> = {
+  portfolio:
+    "Create a modern, responsive portfolio website with a hero section featuring the developer's name and title, a projects grid with card components, a skills section, and a contact form. Use a dark theme with accent colors.",
+  dashboard:
+    "Create a professional admin dashboard with a sidebar navigation, stat cards showing KPIs (users, revenue, growth), a data table, and a chart section. Use a dark theme with clean typography.",
+  landing:
+    "Create a modern SaaS landing page with a hero section with headline and CTA button, a features grid, pricing cards, testimonials, and a footer. Use a dark gradient theme.",
+  generic:
+    "Create a clean, modern single-page web application with a header, main content area, and footer. Use a dark theme with good spacing and typography.",
+};
+
+function legacySystemPrompt(type: string): string {
+  return `You are an expert web developer. Generate a complete single-page website based on the user's description.
 
 You MUST respond with valid JSON only. The JSON must have this exact structure:
 {
@@ -261,109 +315,172 @@ Requirements:
 - Include realistic placeholder content (names, numbers, text)
 - Do NOT include any script tags in the HTML
 - Do NOT include any import statements in the HTML`;
+}
 
-      let generated: { parsed: any; provider: "gemini" | "claude" };
+// ---------------------------------------------------------------------------
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { prompt, is_multipage, stack } = await req.json();
+    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "Prompt is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+
+    // --- Credits: fetch, reset if a day has passed, and check balance ---
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("credits_remaining, credits_daily_limit, credits_reset_at")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) throw new Error("Could not load profile credits");
+
+    let creditsRemaining = profile.credits_remaining;
+    const dailyLimit = profile.credits_daily_limit ?? 5;
+    const resetAt = new Date(profile.credits_reset_at).getTime();
+    const shouldReset = Date.now() - resetAt >= ONE_DAY_MS;
+    if (shouldReset) creditsRemaining = dailyLimit;
+
+    if (creditsRemaining <= 0) {
+      return new Response(
+        JSON.stringify({ error: "You're out of daily credits. They reset every 24 hours." }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const newCredits = creditsRemaining - 1;
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        credits_remaining: newCredits,
+        ...(shouldReset ? { credits_reset_at: new Date().toISOString() } : {}),
+      })
+      .eq("id", user.id);
+    if (updateError) console.error("Failed to update credits:", updateError.message);
+
+    const { key: templateKey, template } = detectTemplate(prompt);
+
+    // =====================================================================
+    // Legacy static generation (opt-in via stack: "static")
+    // =====================================================================
+    if (stack === "static") {
+      const enhanced = `${LEGACY_ENHANCERS[template.legacyType]} The user's specific request: "${prompt.trim()}"`;
+      let generated;
       try {
-        generated = await generateContent(systemPrompt, enhancedPrompt, GEMINI_API_KEY, ANTHROPIC_API_KEY);
+        generated = await generateContent(legacySystemPrompt(template.legacyType), enhanced, GEMINI_API_KEY, ANTHROPIC_API_KEY);
       } catch (err) {
         const status = err instanceof ProviderError ? err.status : 502;
         const message = status === 429
           ? "Rate limit exceeded. Please try again in a moment."
           : err instanceof Error ? err.message : "AI generation failed";
         return new Response(JSON.stringify({ error: message }), {
-          status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      if (generated.provider === "claude") console.log("Generated with Claude fallback");
-
       const parsed = generated.parsed;
-      const result = {
-        title: parsed.title || prompt.slice(0, 60),
-        type: parsed.type || type,
-        html: parsed.html || "<div><h1>Generated App</h1></div>",
-        css: parsed.css || "",
-        react_code: parsed.react_code || "",
-        is_multipage: false,
-        credits_remaining: newCredits,
-      };
-
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          title: parsed.title || prompt.slice(0, 60),
+          type: parsed.type || template.legacyType,
+          html: parsed.html || "<div><h1>Generated App</h1></div>",
+          css: parsed.css || "",
+          react_code: parsed.react_code || "",
+          is_multipage: false,
+          stack: "static",
+          files: null,
+          credits_remaining: newCredits,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    const pageNames = detectMultipageHint(prompt);
-    const pagesDesc = pageNames.map((p) => {
-      if (p === "index") return "index (Home page)";
-      return `${p} (${p.charAt(0).toUpperCase() + p.slice(1)} page)`;
-    }).join(", ");
+    // =====================================================================
+    // Modern generation (default): full Next.js 15 project
+    // =====================================================================
+    const multiRoute = is_multipage !== false;
+    const systemPrompt = modernSystemPrompt(template.brief, multiRoute);
+    const userPrompt = `Build this application: "${prompt.trim()}"
 
-    const enhancedPrompt = `${PROMPT_ENHANCERS[type]} The user's specific request: "${prompt.trim()}"
-    
-Generate a multi-page website with these pages: ${pagesDesc}.`;
+Template category detected: ${templateKey}. Follow the brief but adapt everything to the user's actual request.`;
 
-    const systemPrompt = `You are an expert web developer. Generate a complete multi-page static website based on the user's description.
-
-You MUST respond with valid JSON only. The JSON must have this exact structure:
-{
-  "title": "Short descriptive title for the project",
-  "type": "${type}",
-  "css": "Complete shared CSS styles used across ALL pages",
-  "pages": [
-    { "name": "index", "title": "Home", "html": "Complete HTML body content for the home page" },
-    { "name": "about", "title": "About", "html": "Complete HTML body content for the about page" }
-  ]
-}
-
-CRITICAL Requirements:
-- Generate ${pageNames.length} pages: ${pagesDesc}
-- Each page MUST include a shared navigation bar at the top with links to ALL pages
-- Navigation links must use relative hrefs: "index.html", "about.html", "contact.html" etc.
-- The active page link should be visually highlighted in the nav
-- CSS is SHARED across all pages - write it once in the "css" field
-- Use modern CSS with flexbox/grid, dark backgrounds (#0f172a, #1e293b), white/gray text, and accent colors
-- Each page should have unique, relevant content - NOT placeholder text
-- Make the design professional, polished, and responsive
-- Include a consistent footer across all pages
-- Do NOT include any <script> tags in the HTML
-- Do NOT include <html>, <head>, or <body> tags - just the body innerHTML
-- The "name" field should be the filename without .html extension (e.g., "index", "about", "contact")`;
-
-    let generated: { parsed: any; provider: "gemini" | "claude" };
+    let generated;
     try {
-      generated = await generateContent(systemPrompt, enhancedPrompt, GEMINI_API_KEY, ANTHROPIC_API_KEY);
+      generated = await generateContent(systemPrompt, userPrompt, GEMINI_API_KEY, ANTHROPIC_API_KEY);
     } catch (err) {
       const status = err instanceof ProviderError ? err.status : 502;
       const message = status === 429
         ? "Rate limit exceeded. Please try again in a moment."
         : err instanceof Error ? err.message : "AI generation failed";
       return new Response(JSON.stringify({ error: message }), {
-        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (generated.provider === "claude") console.log("Generated with Claude fallback");
 
     const parsed = generated.parsed;
+    const title = typeof parsed.title === "string" && parsed.title ? parsed.title : prompt.slice(0, 60);
+    const description = typeof parsed.description === "string" ? parsed.description : `${title} — built with WebdevsAI`;
+    const aiFiles: Record<string, string> =
+      parsed.files && typeof parsed.files === "object" && !Array.isArray(parsed.files) ? parsed.files : {};
+    const requestedDeps: string[] = Array.isArray(parsed.dependencies)
+      ? parsed.dependencies.filter((d: unknown) => typeof d === "string")
+      : [];
 
-    const pages = Array.isArray(parsed.pages) && parsed.pages.length > 0
-      ? parsed.pages.map((p: any) => ({
-          name: p.name || "index",
-          title: p.title || p.name || "Page",
-          html: p.html || "",
-        }))
-      : [{ name: "index", title: "Home", html: parsed.html || "<div><h1>Generated App</h1></div>" }];
+    if (!aiFiles["app/page.tsx"]) {
+      return new Response(JSON.stringify({ error: "Generation incomplete (missing app/page.tsx) — please try again." }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const files = buildProjectFiles(title, description, prompt.trim(), aiFiles, requestedDeps);
 
     const result = {
-      title: parsed.title || prompt.slice(0, 60),
-      type: parsed.type || type,
-      html: pages[0]?.html || "",
-      css: parsed.css || "",
-      react_code: "",
-      is_multipage: true,
-      pages,
+      title,
+      type: template.legacyType,
+      html: typeof parsed.preview_html === "string" ? parsed.preview_html : "<div><h1>Preview unavailable</h1></div>",
+      css: typeof parsed.preview_css === "string" ? parsed.preview_css : "",
+      react_code: aiFiles["app/page.tsx"] || "",
+      is_multipage: false,
+      pages: null,
+      stack: "nextjs",
+      files,
       credits_remaining: newCredits,
     };
 
@@ -375,10 +492,7 @@ CRITICAL Requirements:
     console.error("generate-app error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

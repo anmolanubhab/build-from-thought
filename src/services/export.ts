@@ -1,12 +1,17 @@
 import JSZip from "jszip";
 import type { Project } from "@/lib/projects";
-import { getProjectPages } from "@/lib/projects";
+import { getProjectPages, isModernProject } from "@/lib/projects";
 
 export async function downloadProject(project: Project): Promise<void> {
   const zip = new JSZip();
   const pages = getProjectPages(project);
 
-  if (project.is_multipage && pages.length > 1) {
+  if (isModernProject(project)) {
+    // Modern project: full Next.js source tree, ready for `pnpm install && pnpm dev`.
+    for (const [path, content] of Object.entries(project.files!)) {
+      zip.file(path, content);
+    }
+  } else if (project.is_multipage && pages.length > 1) {
     // Multi-page: separate HTML files with shared CSS
     for (const page of pages) {
       const fullHtml = `<!DOCTYPE html>
@@ -49,7 +54,7 @@ export async function downloadProject(project: Project): Promise<void> {
     if (project.css) zip.file("style.css", project.css);
   }
 
-  if (project.react_code) {
+  if (!isModernProject(project) && project.react_code) {
     zip.file("App.jsx", project.react_code);
   }
 

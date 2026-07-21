@@ -9,6 +9,9 @@ export interface GeneratedApp {
   react_code: string;
   pages?: { name: string; title: string; html: string }[];
   is_multipage?: boolean;
+  /** Full Next.js project file map for modern-stack generations. */
+  files?: Record<string, string> | null;
+  stack?: string;
   credits_remaining?: number;
 }
 
