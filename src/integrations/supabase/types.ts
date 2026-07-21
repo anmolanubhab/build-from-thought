@@ -387,6 +387,7 @@ export type Database = {
           is_public: boolean
           is_starred: boolean
           pages: Json | null
+          plan: Json | null
           prompt: string
           react_code: string | null
           slug: string
@@ -409,6 +410,7 @@ export type Database = {
           is_public?: boolean
           is_starred?: boolean
           pages?: Json | null
+          plan?: Json | null
           prompt: string
           react_code?: string | null
           slug: string
@@ -431,6 +433,7 @@ export type Database = {
           is_public?: boolean
           is_starred?: boolean
           pages?: Json | null
+          plan?: Json | null
           prompt?: string
           react_code?: string | null
           slug?: string

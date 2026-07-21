@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Menu } from "lucide-react";
 import { Project, generateSlug } from "@/lib/projects";
-import { generateApp } from "@/services/ai";
+import { generateApp, planProject, type ProjectPlan } from "@/services/ai";
 import { fetchWorkspaceProjects, insertProject, deleteProject as dbDeleteProject, fetchProfileCredits } from "@/services/db";
 import { createBaselineVersion } from "@/services/versions";
 import Sidebar, { ProjectFilter } from "@/components/dashboard/Sidebar";
@@ -24,6 +24,7 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [genStage, setGenStage] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -106,8 +107,38 @@ const Dashboard = () => {
   const handleGenerate = async () => {
     if (!prompt.trim() || generating || !user || !currentWorkspaceId) return;
     setGenerating(true);
+    let stageTimer: ReturnType<typeof setInterval> | undefined;
     try {
-      const result = await generateApp(prompt, isMultipage);
+      // --- Stage 1: Planner Agent ---
+      setGenStage("Understanding your request...");
+      let plan: ProjectPlan | null = null;
+      try {
+        plan = await planProject(prompt, isMultipage);
+      } catch (planErr) {
+        // Planning is an enhancement, never a blocker — generation works without it.
+        console.error("Planner failed, generating without a plan:", planErr);
+      }
+      setGenStage("Planning project architecture...");
+
+      // --- Stage 2: Builder + QA pipeline (rotate real pipeline stage labels) ---
+      const buildStages = [
+        "Designing UI...",
+        "Generating components...",
+        ...(plan?.needs_database ? ["Creating database schema..."] : []),
+        ...(plan?.needs_auth || plan?.needs_api ? ["Connecting backend..."] : []),
+        "Validating project...",
+      ];
+      let stageIdx = 0;
+      setGenStage(buildStages[0]);
+      stageTimer = setInterval(() => {
+        stageIdx = Math.min(stageIdx + 1, buildStages.length - 1);
+        setGenStage(buildStages[stageIdx]);
+      }, 6000);
+
+      const result = await generateApp(prompt, isMultipage, plan);
+      clearInterval(stageTimer);
+      stageTimer = undefined;
+      setGenStage("Preparing your project...");
       const slug = generateSlug(result.title || prompt.slice(0, 40));
       const newProject = await insertProject({
         user_id: user.id,
@@ -123,6 +154,7 @@ const Dashboard = () => {
         pages: result.pages ?? null,
         files: result.files ?? null,
         stack: result.stack ?? "static",
+        plan: (result.plan ?? null) as Record<string, unknown> | null,
       });
       setProjects((prev) => [newProject, ...prev]);
       setPrompt("");
@@ -136,7 +168,7 @@ const Dashboard = () => {
         pages: newProject.pages,
         files: newProject.files ?? null,
       }).catch((err) => console.error("Failed to create baseline version:", err));
-      toast({ title: "App generated!", description: `"${newProject.title}" is ready.` });
+      toast({ title: "Project ready!", description: `"${newProject.title}" is ready.` });
     } catch (err) {
       console.error("Generation failed:", err);
       toast({
@@ -145,6 +177,8 @@ const Dashboard = () => {
         variant: "destructive",
       });
     } finally {
+      if (stageTimer) clearInterval(stageTimer);
+      setGenStage(null);
       setGenerating(false);
     }
   };
@@ -207,6 +241,7 @@ const Dashboard = () => {
             userName={user?.name?.split(" ")[0] || "there"}
             prompt={prompt}
             generating={generating}
+            stage={genStage}
             isMultipage={isMultipage}
             onPromptChange={setPrompt}
             onGenerate={handleGenerate}

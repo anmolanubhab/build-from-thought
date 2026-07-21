@@ -27,6 +27,8 @@ export interface Project {
   pages?: PageData[] | null;
   files?: ProjectFiles | null;
   stack?: string;
+  /** Execution plan / context memory from the Planner Agent. */
+  plan?: Record<string, unknown> | null;
   view_count: number;
   created_at: string;
 }

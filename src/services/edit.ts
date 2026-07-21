@@ -11,6 +11,13 @@ export interface EditResult {
   files?: Record<string, string> | null;
   /** Paths the AI actually touched in this edit (modern projects only). */
   changed_paths?: string[];
+  /** Post-edit validation report (modern projects only). */
+  qa?: {
+    issues_found: number;
+    auto_fixes: string[];
+    ai_fixed: number;
+    remaining: { file: string; issue: string }[];
+  };
 }
 
 export async function editProject(
@@ -20,9 +27,10 @@ export async function editProject(
   currentReactCode: string,
   mode: "apply" | "suggest" = "apply",
   files?: Record<string, string> | null,
+  plan?: Record<string, unknown> | null,
 ): Promise<EditResult> {
   const { data, error } = await supabase.functions.invoke("edit-project", {
-    body: { prompt, currentHtml, currentCss, currentReactCode, mode, files: files ?? undefined },
+    body: { prompt, currentHtml, currentCss, currentReactCode, mode, files: files ?? undefined, plan: plan ?? undefined },
   });
 
   if (error) throw new Error(error.message || "Failed to edit project");

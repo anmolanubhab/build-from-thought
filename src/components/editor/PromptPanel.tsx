@@ -29,12 +29,32 @@ const SUGGESTIONS = [
   "Change the color scheme to blue tones",
 ];
 
+const EDIT_STAGES = [
+  "Analyzing codebase...",
+  "Identifying affected files...",
+  "Applying changes...",
+  "Validating project...",
+];
+
 export default function PromptPanel({ history, loading, onSubmit, onUndo, canUndo, suggestionsEnabled = true }: PromptPanelProps) {
   const [prompt, setPrompt] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
+  const [stageIdx, setStageIdx] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
+
+  // Rotate real pipeline stage labels while an edit runs.
+  useEffect(() => {
+    if (!loading) {
+      setStageIdx(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setStageIdx((i) => Math.min(i + 1, EDIT_STAGES.length - 1));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [loading]);
 
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -148,7 +168,7 @@ export default function PromptPanel({ history, loading, onSubmit, onUndo, canUnd
         {loading && (
           <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
             <Loader2 className="h-3.5 w-3.5 text-violet-400 animate-spin" />
-            <span className="text-xs text-violet-300">Generating changes...</span>
+            <span className="text-xs text-violet-300">{EDIT_STAGES[stageIdx]}</span>
           </div>
         )}
 

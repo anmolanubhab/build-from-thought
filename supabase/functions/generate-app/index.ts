@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk";
 import { buildProjectFiles, DEPENDENCY_ALLOWLIST } from "./scaffold.ts";
+import { validateProject, formatIssues, type ValidationIssue } from "./validator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -227,6 +228,56 @@ async function generateContent(
 }
 
 // ---------------------------------------------------------------------------
+// Plan-driven brief (Phase 2): turns the Planner Agent's structured plan into
+// a precise builder brief, replacing generic template guidance.
+// ---------------------------------------------------------------------------
+
+function planToBrief(plan: any): string {
+  const routes = (plan.routes || [])
+    .map((r: any) => `  - ${r.path}: ${r.purpose || ""}`)
+    .join("\n");
+  const components = (plan.components || [])
+    .map((c: any) => `  - ${c.file}${c.client ? ' ("use client")' : ""}: ${c.purpose || ""}`)
+    .join("\n");
+  const design = plan.design || {};
+  const tables = (plan.database_tables || [])
+    .map((t: any) => `  - ${t.name}: ${t.purpose || ""} [${(t.columns || []).join(", ")}]`)
+    .join("\n");
+
+  let brief = `EXECUTION PLAN (produced by the Planner Agent — follow it precisely):
+Understanding: ${plan.understanding || ""}
+Project type: ${plan.project_type || "landing"} · Complexity: ${plan.complexity || "medium"}
+
+Routes to build:
+${routes || "  - /: Main page"}
+
+Components to build (each in its own file):
+${components || "  (choose sensible section components)"}
+
+Design direction: ${design.mode || "light"} mode · ${design.style || "clean modern"} · ${design.accent || ""}
+${design.notes ? `Design notes: ${design.notes}` : ""}
+
+Planned dependencies: ${(plan.dependencies || []).join(", ") || "none beyond the scaffold"}`;
+
+  if (plan.needs_database) {
+    brief += `
+
+DATA LAYER (the plan requires persisted data):
+Planned tables:
+${tables || "  (design a minimal schema)"}
+- Generate "supabase/schema.sql" with CREATE TABLE statements + sensible RLS policies for the planned tables.
+- Generate "lib/data.ts" exporting typed functions and realistic SAMPLE DATA so the app fully works standalone without any backend configured.
+- Generate "types/index.ts" with the shared TypeScript types for these entities.
+- Components consume lib/data.ts — never call a database directly. Add a short "Connect a database" section to the code comments in lib/data.ts explaining that schema.sql can be applied to a Supabase project later.`;
+  }
+  if (plan.needs_auth) {
+    brief += `
+- The plan flags authentication: include a polished sign-in UI page/component, but wire it to lib/data.ts mock auth (no real backend). Note this clearly in code comments.`;
+  }
+  return brief;
+}
+
+// ---------------------------------------------------------------------------
 // Modern (Next.js 15) system prompt
 // ---------------------------------------------------------------------------
 
@@ -278,6 +329,62 @@ PREVIEW RULES:
 - No <script>, no <html>/<head>/<body> wrappers, no external assets. Use CSS gradients/solid colors instead of images.
 
 Escape all JSON string content correctly. Keep total output focused: 4-10 component files of clean code beat 20 bloated ones.`;
+}
+
+// ---------------------------------------------------------------------------
+// QA Agent (Phase 2): fixes issues the deterministic validator found.
+// ---------------------------------------------------------------------------
+
+async function runQaFix(
+  files: Record<string, string>,
+  issues: ValidationIssue[],
+  geminiKey: string,
+  anthropicKey: string | undefined,
+): Promise<Record<string, string>> {
+  const affected = new Set(issues.map((i) => i.file));
+  // Include files mentioned in issues plus the entry points for context.
+  affected.add("app/page.tsx");
+  const affectedDump = [...affected]
+    .filter((p) => files[p] !== undefined)
+    .map((p) => `--- FILE: ${p} ---\n${files[p]}`)
+    .join("\n\n");
+  const fileList = Object.keys(files).sort().join("\n");
+
+  const systemPrompt = `You are the QA Agent of WebdevsAI. A deterministic validator found concrete problems in a freshly generated Next.js 15 + TypeScript + Tailwind v4 project. Fix ONLY these problems — change nothing else.
+
+PROJECT FILE TREE:
+${fileList}
+
+PROBLEMS TO FIX:
+${formatIssues(issues)}
+
+RELEVANT FILE CONTENTS:
+${affectedDump}
+
+You MUST respond with valid JSON only:
+{
+  "files": { "path/of/fixed/or/new/file.tsx": "FULL corrected file content" }
+}
+
+Rules:
+- Return ONLY files you fixed or created (e.g. a missing component a page imports).
+- Full file contents, not diffs. Preserve everything unrelated to the listed problems.
+- Missing "use client": add the directive as the very first line.
+- Unresolved import of a missing file: CREATE that file with a sensible, complete implementation matching how it is used.
+- Broken route link: either create app/<route>/page.tsx or point the link at an existing route — whichever the surrounding code implies.
+- Unavailable package: rewrite the importing code using available packages or plain React/Tailwind.
+- Never touch package.json, tsconfig.json, next.config.ts, postcss.config.mjs, or .gitignore.`;
+
+  const parsed = (await generateContent(systemPrompt, "Fix the listed problems now.", geminiKey, anthropicKey)).parsed;
+  const fixes: Record<string, string> = {};
+  if (parsed.files && typeof parsed.files === "object" && !Array.isArray(parsed.files)) {
+    for (const [path, content] of Object.entries(parsed.files)) {
+      const normalized = String(path).replace(/^\/+/, "");
+      if (["package.json", "tsconfig.json", "next.config.ts", "postcss.config.mjs", ".gitignore"].includes(normalized)) continue;
+      if (typeof content === "string" && content.length > 0) fixes[normalized] = content;
+    }
+  }
+  return fixes;
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +454,7 @@ serve(async (req) => {
       });
     }
 
-    const { prompt, is_multipage, stack } = await req.json();
+    const { prompt, is_multipage, stack, plan } = await req.json();
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
@@ -430,10 +537,17 @@ serve(async (req) => {
 
     // =====================================================================
     // Modern generation (default): full Next.js 15 project
+    // Phase 2: when the Planner Agent's plan is provided, it drives the brief.
     // =====================================================================
     const multiRoute = is_multipage !== false;
-    const systemPrompt = modernSystemPrompt(template.brief, multiRoute);
-    const userPrompt = `Build this application: "${prompt.trim()}"
+    const hasPlan = plan && typeof plan === "object" && Array.isArray(plan.routes);
+    const brief = hasPlan ? planToBrief(plan) : template.brief;
+    const systemPrompt = modernSystemPrompt(brief, multiRoute);
+    const userPrompt = hasPlan
+      ? `Build this application: "${prompt.trim()}"
+
+Follow the execution plan in the brief precisely — build exactly the planned routes and components.`
+      : `Build this application: "${prompt.trim()}"
 
 Template category detected: ${templateKey}. Follow the brief but adapt everything to the user's actual request.`;
 
@@ -469,18 +583,56 @@ Template category detected: ${templateKey}. Follow the brief but adapt everythin
       });
     }
 
-    const files = buildProjectFiles(title, description, prompt.trim(), aiFiles, requestedDeps);
+    const plannedDeps: string[] = hasPlan && Array.isArray(plan.dependencies)
+      ? plan.dependencies.filter((d: unknown) => typeof d === "string")
+      : [];
+    let files = buildProjectFiles(title, description, prompt.trim(), aiFiles, [
+      ...new Set([...requestedDeps, ...plannedDeps]),
+    ]);
+
+    // --- Smart Validation (Phase 2): deterministic checks + one QA fix round ---
+    let validation = validateProject(files);
+    files = validation.files; // dependency sync applied
+    const qaReport = {
+      issues_found: validation.issues.length,
+      auto_fixes: validation.autoFixes,
+      ai_fixed: 0,
+      remaining: [] as { file: string; issue: string }[],
+    };
+
+    if (validation.issues.length > 0) {
+      try {
+        const fixes = await runQaFix(files, validation.issues, GEMINI_API_KEY, ANTHROPIC_API_KEY);
+        if (Object.keys(fixes).length > 0) {
+          files = { ...files, ...fixes };
+          const revalidation = validateProject(files);
+          files = revalidation.files;
+          qaReport.ai_fixed = validation.issues.length - revalidation.issues.length;
+          qaReport.remaining = revalidation.issues;
+          qaReport.auto_fixes = [...qaReport.auto_fixes, ...revalidation.autoFixes];
+        } else {
+          qaReport.remaining = validation.issues;
+        }
+      } catch (qaErr) {
+        console.error("QA fix round failed (returning unfixed):", qaErr);
+        qaReport.remaining = validation.issues;
+      }
+    }
 
     const result = {
       title,
-      type: template.legacyType,
+      type: hasPlan && ["portfolio", "dashboard", "landing", "generic"].includes(plan.legacy_type)
+        ? plan.legacy_type
+        : template.legacyType,
       html: typeof parsed.preview_html === "string" ? parsed.preview_html : "<div><h1>Preview unavailable</h1></div>",
       css: typeof parsed.preview_css === "string" ? parsed.preview_css : "",
-      react_code: aiFiles["app/page.tsx"] || "",
+      react_code: files["app/page.tsx"] || "",
       is_multipage: false,
       pages: null,
       stack: "nextjs",
       files,
+      plan: hasPlan ? plan : null,
+      qa: qaReport,
       credits_remaining: newCredits,
     };
 

@@ -1,6 +1,7 @@
 // path: supabase/functions/edit-project/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk";
+import { validateProject, formatIssues, type ValidationIssue } from "./validator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,20 +105,63 @@ async function generateContent(
 }
 
 // ---------------------------------------------------------------------------
+// Analyzer Agent (Phase 2): for large projects, decide which files the edit
+// actually touches before sending contents — codebase-aware, token-efficient.
+// ---------------------------------------------------------------------------
 
-function modernEditSystemPrompt(files: Record<string, string>, mode: string): string {
+const ANALYZE_THRESHOLD_CHARS = 60_000;
+const ANALYZE_THRESHOLD_FILES = 9;
+
+function analyzerSystemPrompt(files: Record<string, string>, plan: any): string {
+  // A compact project map: path + imports + first line of each file.
+  const map = Object.entries(files)
+    .map(([path, content]) => {
+      const imports = [...content.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]).slice(0, 12);
+      const isClient = /^\s*["']use client["']/.test(content);
+      return `${path}${isClient ? " [client]" : ""} — imports: ${imports.join(", ") || "none"}`;
+    })
+    .join("\n");
+
+  return `You are the Analyzer Agent of WebdevsAI. Before editing an existing Next.js 15 (App Router) repository, you determine which files a change request actually affects. Never select unrelated files.
+
+PROJECT MAP (path [client?] — imports):
+${map}
+${plan ? `\nPROJECT CONTEXT (original execution plan):\nType: ${plan.project_type || "?"} · Design: ${plan.design ? `${plan.design.mode || ""} ${plan.design.style || ""}` : "?"}\nUnderstanding: ${plan.understanding || ""}` : ""}
+
+You MUST respond with valid JSON only:
+{
+  "relevant_files": ["components/navbar.tsx", "app/globals.css"],
+  "may_create": ["components/new-thing.tsx"],
+  "reason": "one sentence"
+}
+
+Rules:
+- relevant_files: existing files that must be read/modified for this request (smallest sufficient set, max 10).
+- may_create: new file paths the change will likely need (often empty).
+- A style/theme change usually means the specific component file(s); a global color change means app/globals.css.
+- Never include package.json, tsconfig.json, next.config.ts, postcss.config.mjs, or .gitignore.`;
+}
+
+// ---------------------------------------------------------------------------
+
+function modernEditSystemPrompt(files: Record<string, string>, mode: string, plan: any, scopedPaths?: string[]): string {
   const fileList = Object.keys(files).sort().join("\n");
-  const fileDump = Object.entries(files)
-    .filter(([path]) => !PROTECTED_PATHS.has(path))
+  const dumpEntries = scopedPaths
+    ? Object.entries(files).filter(([path]) => scopedPaths.includes(path) && !PROTECTED_PATHS.has(path))
+    : Object.entries(files).filter(([path]) => !PROTECTED_PATHS.has(path));
+  const fileDump = dumpEntries
     .map(([path, content]) => `--- FILE: ${path} ---\n${content}`)
     .join("\n\n");
+  const contextBlock = plan
+    ? `\nPROJECT CONTEXT (original execution plan — preserve this direction):\nType: ${plan.project_type || "?"} · Complexity: ${plan.complexity || "?"}\nUnderstanding: ${plan.understanding || ""}\nDesign: ${plan.design ? `${plan.design.mode || ""} mode · ${plan.design.style || ""} · ${plan.design.accent || ""}` : "?"}\n`
+    : "";
 
   return `You are a senior software engineer editing an EXISTING Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS v4 repository. You behave like an experienced engineer working in a real codebase: analyze first, then change ONLY what the request requires.
 
 PROJECT FILE TREE:
 ${fileList}
-
-FILE CONTENTS (config files omitted — never modify package.json, tsconfig.json, next.config.ts, postcss.config.mjs, .gitignore):
+${contextBlock}
+${scopedPaths ? "FILE CONTENTS (scoped by the Analyzer Agent to the files relevant to this request — other files exist per the tree above; do not modify them)" : "FILE CONTENTS (config files omitted — never modify package.json, tsconfig.json, next.config.ts, postcss.config.mjs, .gitignore)"}:
 ${fileDump}
 
 ${mode === "suggestion" ? "The user wants a PROPOSAL: describe what you would change and provide the updated files." : "Apply the requested change directly."}
@@ -180,6 +224,60 @@ Rules:
 }
 
 // ---------------------------------------------------------------------------
+// QA Agent (Phase 2): fixes issues the deterministic validator found post-edit.
+// ---------------------------------------------------------------------------
+
+async function runQaFix(
+  files: Record<string, string>,
+  issues: ValidationIssue[],
+  geminiKey: string,
+  anthropicKey: string | undefined,
+): Promise<Record<string, string>> {
+  const affected = new Set(issues.map((i) => i.file));
+  affected.add("app/page.tsx");
+  const affectedDump = [...affected]
+    .filter((p) => files[p] !== undefined)
+    .map((p) => `--- FILE: ${p} ---\n${files[p]}`)
+    .join("\n\n");
+  const fileList = Object.keys(files).sort().join("\n");
+
+  const systemPrompt = `You are the QA Agent of WebdevsAI. A deterministic validator found concrete problems after an edit to a Next.js 15 + TypeScript + Tailwind v4 project. Fix ONLY these problems — change nothing else.
+
+PROJECT FILE TREE:
+${fileList}
+
+PROBLEMS TO FIX:
+${formatIssues(issues)}
+
+RELEVANT FILE CONTENTS:
+${affectedDump}
+
+You MUST respond with valid JSON only:
+{
+  "files": { "path/of/fixed/or/new/file.tsx": "FULL corrected file content" }
+}
+
+Rules:
+- Return ONLY files you fixed or created. Full contents, not diffs.
+- Missing "use client": add the directive as the very first line.
+- Unresolved import of a missing file: CREATE that file with a sensible, complete implementation matching how it is used.
+- Broken route link: create the route page or point the link at an existing route — whichever the code implies.
+- Unavailable package: rewrite the importing code using available packages or plain React/Tailwind.
+- Never touch package.json, tsconfig.json, next.config.ts, postcss.config.mjs, or .gitignore.`;
+
+  const parsed = await generateContent(systemPrompt, "Fix the listed problems now.", geminiKey, anthropicKey);
+  const fixes: Record<string, string> = {};
+  if (parsed.files && typeof parsed.files === "object" && !Array.isArray(parsed.files)) {
+    for (const [path, content] of Object.entries(parsed.files)) {
+      const normalized = String(path).replace(/^\/+/, "");
+      if (PROTECTED_PATHS.has(normalized)) continue;
+      if (typeof content === "string" && content.length > 0) fixes[normalized] = content;
+    }
+  }
+  return fixes;
+}
+
+// ---------------------------------------------------------------------------
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -187,7 +285,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, currentHtml, currentCss, currentReactCode, files, mode } = await req.json();
+    const { prompt, currentHtml, currentCss, currentReactCode, files, mode, plan } = await req.json();
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
@@ -204,13 +302,40 @@ serve(async (req) => {
     const isModern = files && typeof files === "object" && !Array.isArray(files) && Object.keys(files).length > 0;
 
     // =====================================================================
-    // Modern file-aware editing
+    // Modern file-aware editing (Phase 2: analyze → edit → validate)
     // =====================================================================
     if (isModern) {
+      const projectPlan = plan && typeof plan === "object" ? plan : null;
+
+      // --- Analyzer stage: scope large projects to the relevant files only ---
+      let scopedPaths: string[] | undefined;
+      const totalChars = Object.values(files as Record<string, string>).reduce(
+        (sum: number, c) => sum + (typeof c === "string" ? c.length : 0),
+        0,
+      );
+      if (totalChars > ANALYZE_THRESHOLD_CHARS && Object.keys(files).length > ANALYZE_THRESHOLD_FILES) {
+        try {
+          const analysis = await generateContent(
+            analyzerSystemPrompt(files, projectPlan),
+            prompt.trim(),
+            GEMINI_API_KEY,
+            ANTHROPIC_API_KEY,
+          );
+          const relevant: string[] = Array.isArray(analysis.relevant_files)
+            ? analysis.relevant_files.filter((p: unknown) => typeof p === "string" && (files as any)[p] !== undefined)
+            : [];
+          if (relevant.length > 0 && relevant.length <= 12) {
+            scopedPaths = relevant;
+          }
+        } catch (analyzeErr) {
+          console.error("Analyzer stage failed — falling back to full-context edit:", analyzeErr);
+        }
+      }
+
       let parsed;
       try {
         parsed = await generateContent(
-          modernEditSystemPrompt(files, applyMode),
+          modernEditSystemPrompt(files, applyMode, projectPlan, scopedPaths),
           prompt.trim(),
           GEMINI_API_KEY,
           ANTHROPIC_API_KEY,
@@ -242,8 +367,38 @@ serve(async (req) => {
         : [];
 
       // Merge server-side so the client gets a consistent full map back.
-      const mergedFiles: Record<string, string> = { ...files, ...changedFiles };
+      let mergedFiles: Record<string, string> = { ...files, ...changedFiles };
       for (const path of deletedFiles) delete mergedFiles[path];
+
+      // --- Smart Validation: deterministic checks + one QA fix round ---
+      let validation = validateProject(mergedFiles);
+      mergedFiles = validation.files; // dependency sync applied
+      const qaReport = {
+        issues_found: validation.issues.length,
+        auto_fixes: validation.autoFixes,
+        ai_fixed: 0,
+        remaining: [] as { file: string; issue: string }[],
+      };
+      const qaFixedPaths: string[] = [];
+      if (validation.issues.length > 0) {
+        try {
+          const fixes = await runQaFix(mergedFiles, validation.issues, GEMINI_API_KEY, ANTHROPIC_API_KEY);
+          if (Object.keys(fixes).length > 0) {
+            qaFixedPaths.push(...Object.keys(fixes).filter((p) => !changedFiles[p]));
+            mergedFiles = { ...mergedFiles, ...fixes };
+            const revalidation = validateProject(mergedFiles);
+            mergedFiles = revalidation.files;
+            qaReport.ai_fixed = validation.issues.length - revalidation.issues.length;
+            qaReport.remaining = revalidation.issues;
+            qaReport.auto_fixes = [...qaReport.auto_fixes, ...revalidation.autoFixes];
+          } else {
+            qaReport.remaining = validation.issues;
+          }
+        } catch (qaErr) {
+          console.error("QA fix round failed (returning unfixed):", qaErr);
+          qaReport.remaining = validation.issues;
+        }
+      }
 
       const result = {
         summary: parsed.summary || "Changes applied",
@@ -252,7 +407,12 @@ serve(async (req) => {
         css: typeof parsed.preview_css === "string" && parsed.preview_css ? parsed.preview_css : (currentCss || ""),
         react_code: mergedFiles["app/page.tsx"] || currentReactCode || "",
         files: mergedFiles,
-        changed_paths: [...Object.keys(changedFiles), ...deletedFiles.map((p) => `deleted: ${p}`)],
+        changed_paths: [
+          ...Object.keys(changedFiles),
+          ...deletedFiles.map((p) => `deleted: ${p}`),
+          ...qaFixedPaths.map((p) => `qa-fixed: ${p}`),
+        ],
+        qa: qaReport,
       };
 
       return new Response(JSON.stringify(result), {

@@ -28,6 +28,7 @@ export async function insertProject(project: {
   pages?: PageData[] | null;
   files?: Record<string, string> | null;
   stack?: string;
+  plan?: Record<string, unknown> | null;
 }): Promise<Project> {
   const { data, error } = await supabase
     .from("projects")
@@ -129,5 +130,6 @@ export async function remixProject(originalProject: Project, newUserId: string, 
     pages: originalProject.pages,
     files: originalProject.files ?? null,
     stack: originalProject.stack ?? "static",
+    plan: originalProject.plan ?? null,
   });
 }

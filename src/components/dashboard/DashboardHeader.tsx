@@ -5,6 +5,8 @@ interface DashboardHeaderProps {
   userName: string;
   prompt: string;
   generating: boolean;
+  /** Current AI pipeline stage label (e.g. "Planning project architecture...") */
+  stage?: string | null;
   isMultipage: boolean;
   onPromptChange: (v: string) => void;
   onGenerate: () => void;
@@ -15,6 +17,7 @@ export default function DashboardHeader({
   userName,
   prompt,
   generating,
+  stage,
   isMultipage,
   onPromptChange,
   onGenerate,
@@ -111,7 +114,7 @@ export default function DashboardHeader({
 
         {generating && (
           <p className="wb-mono mt-4 text-xs animate-pulse" style={{ color: "var(--wb-ember)" }}>
-            ⚡ Generating your {isMultipage ? "multi-page website" : "app"}... This may take 10-20 seconds.
+            ⚡ {stage || `Generating your ${isMultipage ? "multi-page website" : "app"}...`}
           </p>
         )}
       </div>

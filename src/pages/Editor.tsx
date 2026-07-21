@@ -150,7 +150,8 @@ export default function Editor() {
         project.css || "",
         project.react_code || "",
         mode,
-        project.files ?? null
+        project.files ?? null,
+        project.plan ?? null
       );
 
       if (mode === "suggest") {
