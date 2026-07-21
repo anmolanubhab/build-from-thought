@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Code, Eye, Monitor, Smartphone, Tablet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PageData } from "@/lib/projects";
+import LivePreview from "@/components/editor/LivePreview";
 
 interface PreviewPanelProps {
   html: string;
@@ -13,6 +14,12 @@ interface PreviewPanelProps {
   previewChanges?: { summary: string; changes: string[]; html: string; css: string; pages?: PageData[]; files?: Record<string, string> | null } | null;
   onAcceptPreview?: () => void;
   onRejectPreview?: () => void;
+  /** Modern (Next.js) projects only — enables the real live preview runtime in place of the static HTML approximation. Legacy (html/css-only) projects keep the static preview unchanged. */
+  projectId?: string;
+  /** Open draft's version id, if any — the live preview runs whatever's actually being edited, not just the last published snapshot. */
+  versionId?: string | null;
+  /** Applies an AI fix for a live-preview build error; return true if a fix was applied so the preview should restart. */
+  onFixPreviewError?: (errorMessage: string, logTail: string) => Promise<boolean>;
 }
 
 type ViewMode = "preview" | "code";
@@ -26,6 +33,7 @@ const DEVICE_WIDTHS: Record<DeviceMode, string> = {
 
 export default function PreviewPanel({
   html, css, title, pages, files, previewChanges, onAcceptPreview, onRejectPreview,
+  projectId, versionId, onFixPreviewError,
 }: PreviewPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [device, setDevice] = useState<DeviceMode>("desktop");
@@ -157,19 +165,29 @@ export default function PreviewPanel({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-auto bg-gray-100 flex items-start justify-center p-4">
+      <div className={cn("flex-1 overflow-auto bg-gray-100 flex items-start justify-center", viewMode === "preview" && isModern && !previewChanges && projectId ? "p-0" : "p-4")}>
         {viewMode === "preview" ? (
-          <div
-            className="bg-white rounded-lg shadow-sm overflow-hidden transition-all duration-300"
-            style={{ width: DEVICE_WIDTHS[device], maxWidth: "100%", height: "100%" }}
-          >
-            <iframe
-              srcDoc={fullPage}
-              className="w-full h-full border-0"
-              title="Project preview"
-              sandbox="allow-scripts"
-            />
-          </div>
+          isModern && !previewChanges && projectId ? (
+            // Real, live Next.js preview — replaces the static HTML approximation for
+            // modern projects. Falls back to the static render below only while an
+            // unsaved "suggest" diff is being previewed (previewChanges), since that
+            // content hasn't been persisted for the sandbox to pull yet.
+            <div className="w-full h-full bg-white">
+              <LivePreview projectId={projectId} versionId={versionId} files={files ?? null} onFixErrors={onFixPreviewError} />
+            </div>
+          ) : (
+            <div
+              className="bg-white rounded-lg shadow-sm overflow-hidden transition-all duration-300"
+              style={{ width: DEVICE_WIDTHS[device], maxWidth: "100%", height: "100%" }}
+            >
+              <iframe
+                srcDoc={fullPage}
+                className="w-full h-full border-0"
+                title="Project preview"
+                sandbox="allow-scripts"
+              />
+            </div>
+          )
         ) : isModern ? (
           <div className="w-full h-full flex gap-3">
             {/* File tree */}

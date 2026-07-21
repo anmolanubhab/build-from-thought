@@ -208,6 +208,38 @@ export default function Editor() {
     toast({ title: "Draft updated", description: previewChanges.summary });
   };
 
+  const handleFixPreviewError = async (errorMessage: string, logTail: string): Promise<boolean> => {
+    if (!project) return false;
+    setEditing(true);
+    const prompt = `The live preview failed to build or crashed at runtime. Diagnose the cause from the error and logs below, then fix the underlying files.\n\nError: ${errorMessage}\n\nBuild/server logs (tail):\n${(logTail || "").slice(-4000)}`;
+    try {
+      const result = await editProject(
+        prompt,
+        project.html || "",
+        project.css || "",
+        project.react_code || "",
+        "apply",
+        project.files ?? null,
+        project.plan ?? null
+      );
+      setUndoStack((prev) => [
+        ...prev,
+        { html: project.html || "", css: project.css || "", react_code: project.react_code || "", pages: project.pages, files: project.files ?? null },
+      ]);
+      const nextFiles = result.files ?? project.files ?? null;
+      const updated: Project = { ...project, html: result.html, css: result.css, react_code: result.react_code, files: nextFiles };
+      setProject(updated);
+      await saveDraft(result.html, result.css, result.react_code, project.pages, result.summary || "Fix preview error", nextFiles);
+      toast({ title: "Fix applied", description: result.summary || "Applied a fix — restarting the preview." });
+      return true;
+    } catch (err) {
+      toast({ title: "Auto-fix failed", description: err instanceof Error ? err.message : "Couldn't generate a fix — check the logs and try editing manually.", variant: "destructive" });
+      return false;
+    } finally {
+      setEditing(false);
+    }
+  };
+
   const handlePublish = async () => {
     if (!draft) return;
     setPublishing(true);
@@ -369,6 +401,9 @@ export default function Editor() {
             } : null}
             onAcceptPreview={handleAcceptPreview}
             onRejectPreview={() => setPreviewChanges(null)}
+            projectId={project.id}
+            versionId={draft?.id ?? null}
+            onFixPreviewError={handleFixPreviewError}
           />
         </div>
       </div>

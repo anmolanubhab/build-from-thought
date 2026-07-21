@@ -1,0 +1,19 @@
+# path: e2b/nextjs-template/e2b.toml
+# Generated/maintained alongside e2b.Dockerfile — see that file's header for the
+# full explanation and the manual build steps (requires your own E2B account).
+#
+# `e2b template build` (run from this directory) reads this file for the
+# template's metadata; the actual image is defined by e2b.Dockerfile.
+
+team_id = ""                     # filled in automatically by `e2b template build`
+template_id = "webdevsai-nextjs" # must match the E2B_TEMPLATE_ID secret you set
+dockerfile = "e2b.Dockerfile"
+template_name = "webdevsai-nextjs"
+
+# Every project preview-start boots runs `next dev` on this port and reads it
+# back via sbx.getHost(DEV_PORT) — keep in sync with DEV_PORT in
+# supabase/functions/preview-start/index.ts if either one ever changes.
+start_cmd = ""   # left empty on purpose: preview-start starts `next dev` itself
+                 # per-request (it needs the real project files written first),
+                 # this template only provides a pre-warmed filesystem, not a
+                 # long-running process baked into the image.
