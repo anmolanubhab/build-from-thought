@@ -1,6 +1,28 @@
 // path: src/services/userSupabase.ts
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * supabase-js's functions.invoke() collapses ANY non-2xx edge function response into a
+ * generic `FunctionsHttpError` whose `.message` is just "Edge Function returned a non-2xx
+ * status code" — the actual `{ error }` JSON body the function sends back (e.g. "That token
+ * was rejected by Supabase...") is only reachable via `error.context` (the raw fetch Response).
+ * Same fix as src/services/database.ts's extractFunctionErrorMessage — duplicated here since
+ * this module has no shared import path to that one without creating a cross-service dependency.
+ */
+async function extractFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context && typeof (context as Response).json === "function") {
+    try {
+      const body = await (context as Response).json();
+      const msg = (body as { message?: unknown; error?: unknown } | null)?.message ?? (body as { error?: unknown } | null)?.error;
+      if (typeof msg === "string" && msg.trim()) return msg;
+    } catch {
+      // Response body wasn't JSON (or already consumed) — fall through to the generic message.
+    }
+  }
+  return (error as { message?: string } | null)?.message || fallback;
+}
+
 export interface SupabaseProjectOption {
   ref: string;
   name: string;
@@ -20,7 +42,7 @@ export async function connectSupabaseWithToken(personalAccessToken: string): Pro
     body: { personal_access_token: personalAccessToken },
   });
 
-  if (error) throw new Error(error.message || "Failed to connect Supabase");
+  if (error) throw new Error(await extractFunctionErrorMessage(error, "Failed to connect Supabase"));
   if (data?.error) throw new Error(data.error);
 
   return (data?.projects ?? []) as SupabaseProjectOption[];
