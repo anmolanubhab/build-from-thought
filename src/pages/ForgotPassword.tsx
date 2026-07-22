@@ -31,15 +31,15 @@ const ForgotPassword = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 relative overflow-hidden">
-      <div className="glow-orb w-[500px] h-[500px] bg-[#ff3cac] top-[-200px] left-[-100px] animate-pulse-glow" />
-      <div className="glow-orb w-[400px] h-[400px] bg-[#2b86c5] bottom-[-150px] right-[-100px] animate-pulse-glow" />
+      <div className="glow-orb w-[500px] h-[500px] bg-[#22D3EE] top-[-200px] left-[-100px] animate-pulse-glow" />
+      <div className="glow-orb w-[400px] h-[400px] bg-[#7C3AED] bottom-[-150px] right-[-100px] animate-pulse-glow" />
 
       <div className="w-full max-w-md relative z-10">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
           <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
         </Link>
 
-        <div className="glass rounded-2xl p-8">
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-200/50 p-8">
           {sent ? (
             <div className="text-center space-y-4">
               <CheckCircle className="h-12 w-12 text-primary mx-auto" />
