@@ -1,7 +1,7 @@
 // path: src/pages/Editor.tsx
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Menu, X, History, Eye, Rocket, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Menu, X, History, RefreshCw, Rocket, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -10,8 +10,9 @@ import type { Project, PageData } from "@/lib/projects";
 import { getProjectPages } from "@/lib/projects";
 import {
   fetchOpenDraft, createDraft, updateDraft, discardDraft, publishVersion,
-  createPreviewDeployment, type ProjectVersion,
+  type ProjectVersion,
 } from "@/services/versions";
+import { syncPreview, startPreview } from "@/services/preview";
 import PromptPanel, { PromptEntry } from "@/components/editor/PromptPanel";
 import PreviewPanel from "@/components/editor/PreviewPanel";
 import VersionHistoryDialog from "@/components/editor/VersionHistoryDialog";
@@ -270,15 +271,32 @@ export default function Editor() {
     }
   };
 
+  /**
+   * The draft banner's "Preview" button used to spin up a REAL Vercel deployment
+   * under a new `<slug>-preview` project (via createPreviewDeployment/vercel-deploy).
+   * That's wrong: draft changes should be reviewed in the app's own live sandbox
+   * (PreviewPanel/LivePreview, already wired to this draft via versionId={draft.id}
+   * and already auto-syncing on every edit) — a real deployment should only happen
+   * once the user is happy, via "Publish". This now just makes sure the in-app
+   * sandbox is caught up and tells the user where to look, instead of deploying
+   * anything or opening a new tab.
+   */
   const handlePreviewDraft = async () => {
     if (!draft || !project) return;
+    const isModern = Boolean(project.files && Object.keys(project.files).length > 0);
+    if (!isModern) {
+      toast({ title: "Preview is up to date", description: "Your draft changes are already shown in the preview panel." });
+      return;
+    }
     setPreviewing(true);
     try {
-      const result = await createPreviewDeployment(project.id, draft.id);
-      window.open(result.url, "_blank");
-      toast({ title: "Preview opened", description: "It may take a few seconds to finish building." });
+      const result = await syncPreview(project.id, draft.id);
+      if (result.status === "idle") {
+        await startPreview(project.id, draft.id);
+      }
+      toast({ title: "Preview is up to date", description: "Your draft changes are live in the preview panel on the right." });
     } catch (err) {
-      toast({ title: "Preview failed", description: err instanceof Error ? err.message : "Connect Vercel first from Resources → Connectors.", variant: "destructive" });
+      toast({ title: "Couldn't refresh preview", description: err instanceof Error ? err.message : "Something went wrong refreshing the live preview.", variant: "destructive" });
     } finally {
       setPreviewing(false);
     }
@@ -354,9 +372,10 @@ export default function Editor() {
           <button
             onClick={handlePreviewDraft}
             disabled={previewing}
+            title="Refresh the live preview panel with your latest draft changes"
             className="flex items-center gap-1 text-xs font-medium text-amber-800 hover:text-amber-900 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors"
           >
-            {previewing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />} Preview
+            {previewing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Preview
           </button>
           <button
             onClick={handleDiscardDraft}
