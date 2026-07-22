@@ -63,25 +63,40 @@ class ProviderError extends Error {
   }
 }
 
+// Gemini occasionally returns 503 ("model overloaded") or 429 (rate limited) —
+// both are transient and worth a couple of quick retries before giving up (and,
+// if configured, falling back to Claude). Without this, a single momentary
+// blip on Google's side surfaced as a hard, unrecoverable "Gemini API error: 503"
+// for the whole database-provisioning flow, even though retrying moments later
+// would very likely have succeeded.
+const GEMINI_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const GEMINI_RETRY_DELAYS_MS = [1000, 2500];
+
 async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
-    }),
-  });
-  if (!response.ok) {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= GEMINI_RETRY_DELAYS_MS.length; attempt++) {
+    const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
+      }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!content) throw new Error("No content in Gemini response");
+      return content;
+    }
     const text = await response.text();
     console.error("Gemini API error:", response.status, text);
-    throw new ProviderError(`Gemini API error: ${response.status}`, response.status);
+    lastErr = new ProviderError(`Gemini API error: ${response.status}`, response.status);
+    if (!GEMINI_RETRYABLE_STATUSES.has(response.status) || attempt === GEMINI_RETRY_DELAYS_MS.length) break;
+    await sleep(GEMINI_RETRY_DELAYS_MS[attempt]);
   }
-  const data = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!content) throw new Error("No content in Gemini response");
-  return content;
+  throw lastErr;
 }
 
 async function generateWithClaude(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
@@ -164,6 +179,11 @@ async function mgmtFetch(path: string, token: string, init?: RequestInit, attemp
 function friendlyError(raw: unknown): { message: string; retryable: boolean } {
   const text = raw instanceof Error ? raw.message : String(raw);
   const lower = text.toLowerCase();
+  // AI provider errors (Gemini/Claude) — check BEFORE the generic 502/503/504
+  // branch below, which would otherwise mislabel these as Supabase outages.
+  if (lower.includes("gemini api error") || lower.includes("claude") || lower.includes("no content in") || lower.includes("could not parse ai response")) {
+    return { message: "The AI that designs your database schema is temporarily overloaded. Please try again in a moment — this almost always succeeds on retry.", retryable: true };
+  }
   if (lower.includes("401") || lower.includes("403") || lower.includes("unauthorized") || lower.includes("invalid api key")) {
     return { message: "Your Supabase connection looks expired or lacks permission. Reconnect it in Settings → Resources and try again.", retryable: false };
   }
@@ -785,7 +805,10 @@ serve(async (req) => {
         return json(result);
       } catch (err) {
         // finishProvisioning already rolled back tables + marked the row as "error".
-        return json({ error: err instanceof Error ? err.message : "Failed to provision the database" }, 502);
+        // Route through friendlyError() so raw provider errors (e.g. "Gemini API
+        // error: 503") reach the user as an actionable message instead of verbatim.
+        const friendly = friendlyError(err);
+        return json({ error: friendly.message }, 502);
       }
     }
 
