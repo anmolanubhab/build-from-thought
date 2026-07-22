@@ -53,6 +53,36 @@ export type Database = {
           },
         ]
       }
+      connected_apps: {
+        Row: {
+          connected_at: string
+          id: string
+          metadata: Json
+          provider: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          id?: string
+          metadata?: Json
+          provider: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          id?: string
+          metadata?: Json
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       deployments: {
         Row: {
           ai_suggestions: Json | null
@@ -108,6 +138,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      desktop_devices: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          device_name: string
+          id: string
+          last_active: string
+          os: string
+          user_id: string
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          device_name: string
+          id?: string
+          last_active?: string
+          os: string
+          user_id: string
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          device_name?: string
+          id?: string
+          last_active?: string
+          os?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       github_tokens: {
         Row: {
@@ -191,6 +251,68 @@ export type Database = {
           plan?: string
         }
         Relationships: []
+      }
+      preview_sessions: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          expires_at: string | null
+          files_hash: string | null
+          id: string
+          last_active_at: string
+          locked_at: string | null
+          log_tail: string | null
+          port: number
+          preview_url: string | null
+          project_id: string
+          provider: string
+          sandbox_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string | null
+          files_hash?: string | null
+          id?: string
+          last_active_at?: string
+          locked_at?: string | null
+          log_tail?: string | null
+          port?: number
+          preview_url?: string | null
+          project_id: string
+          provider?: string
+          sandbox_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string | null
+          files_hash?: string | null
+          id?: string
+          last_active_at?: string
+          locked_at?: string | null
+          log_tail?: string | null
+          port?: number
+          preview_url?: string | null
+          project_id?: string
+          provider?: string
+          sandbox_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preview_sessions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -622,6 +744,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      telegram_link_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       vercel_connections: {
         Row: {

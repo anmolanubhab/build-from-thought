@@ -69,7 +69,7 @@ const DashboardSettings = () => {
   const nav: { group?: string; items: { id: SectionId; label: string; icon: typeof User }[] }[] = [
     { items: [
       { id: "account", label: user?.name || "Account", icon: User },
-      { id: "devices", label: "Devices & apps", icon: Laptop },
+      { id: "devices", label: "Devices & Apps", icon: Laptop },
     ] },
     { group: "Workspace", items: [
       { id: "workspace", label: currentWorkspace?.name || "Workspace", icon: Sparkles },
