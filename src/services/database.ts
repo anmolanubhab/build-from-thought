@@ -1,6 +1,28 @@
 // path: src/services/database.ts
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * supabase-js's functions.invoke() collapses ANY non-2xx edge function response into a
+ * generic `FunctionsHttpError` whose `.message` is just "Edge Function returned a non-2xx
+ * status code" — the actual `{ error, message }` JSON body our functions send back is only
+ * reachable via `error.context` (the raw fetch Response). Without this, every real error
+ * message from provision-database/check-database-provisioning (e.g. "This project has no
+ * database schema...") got swallowed and replaced with that one generic string.
+ */
+async function extractFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context && typeof (context as Response).json === "function") {
+    try {
+      const body = await (context as Response).json();
+      const msg = (body as { message?: unknown; error?: unknown } | null)?.message ?? (body as { error?: unknown } | null)?.error;
+      if (typeof msg === "string" && msg.trim()) return msg;
+    } catch {
+      // Response body wasn't JSON (or already consumed) — fall through to the generic message.
+    }
+  }
+  return (error as { message?: string } | null)?.message || fallback;
+}
+
 export type DatabaseProvider = "supabase";
 export type DatabaseMode = "shared" | "dedicated";
 export type DatabaseStatus = "provisioning" | "ready" | "error";
@@ -36,7 +58,7 @@ export async function provisionDatabase(projectId: string, mode: DatabaseMode): 
   const { data, error } = await supabase.functions.invoke("provision-database", {
     body: { project_id: projectId, mode },
   });
-  if (error) throw new Error(error.message || "Failed to start database provisioning");
+  if (error) throw new Error(await extractFunctionErrorMessage(error, "Failed to start database provisioning"));
   if (data?.error) throw new Error(data.message || data.error);
   return data as ProvisionResult;
 }
@@ -46,7 +68,7 @@ export async function checkDatabaseProvisioning(projectId: string): Promise<Prov
   const { data, error } = await supabase.functions.invoke("check-database-provisioning", {
     body: { project_id: projectId },
   });
-  if (error) throw new Error(error.message || "Failed to check provisioning status");
+  if (error) throw new Error(await extractFunctionErrorMessage(error, "Failed to check provisioning status"));
   if (data?.error) throw new Error(data.message || data.error);
   return data as ProvisionResult;
 }

@@ -416,6 +416,62 @@ Respond with valid JSON only: { "files": { "lib/data.ts": "FULL new file content
   return { files: next, rewired };
 }
 
+/**
+ * When a project has no supabase/schema.sql — because the AI planner didn't
+ * originally flag it as needing a database — infers a reasonable schema (and
+ * a real lib/data.ts + updated consumer files) from the project's EXISTING
+ * UI/components, so "Add Database" works on any generated app, not only the
+ * ones the planner happened to flag up front.
+ */
+async function synthesizeDataLayer(
+  files: Record<string, string>,
+  geminiKey: string,
+  anthropicKey: string | undefined,
+): Promise<{ files: Record<string, string> }> {
+  const relevantPaths = Object.keys(files).filter((p) =>
+    /\.(ts|tsx)$/.test(p) &&
+    (p.startsWith("app/") || p.startsWith("components/") || p.startsWith("lib/") || p.startsWith("types/")) &&
+    !p.startsWith("components/ui/"),
+  );
+  const dump = relevantPaths.map((p) => `--- FILE: ${p} ---\n${files[p]}`).join("\n\n").slice(0, 60000);
+
+  const systemPrompt = `You are the Database Agent of WebdevsAI. This app was originally generated WITHOUT a database — whatever list(s) of records it shows are hardcoded sample data baked directly into its components or page files (no lib/data.ts exists yet). The user has now asked to add a real, persisted Supabase database so the data survives reloads and is shared across sessions.
+
+PROJECT FILES (TypeScript/TSX only, UI primitives omitted):
+${dump}
+
+Your job:
+1. Identify the core entity/entities this app manages from its actual UI and hardcoded sample data (e.g. a contacts list, tasks, bookings — infer this from the code, don't guess generically).
+2. Design a minimal, correct "supabase/schema.sql": CREATE TABLE statement(s) with sensible columns/types matching the fields already used in the UI, "id uuid primary key default gen_random_uuid()", "created_at timestamptz not null default now()", and RLS enabled with a permissive policy (this app has no per-user auth, so allow all operations to anon/authenticated).
+3. Write a complete "lib/data.ts": real, async, fully-typed CRUD functions (list with search/pagination/sort, get-by-id, create, update, delete) querying the table(s) via a Supabase client imported as \`import { supabase } from "@/lib/supabase";\`. Use the EXACT table name(s) from your schema.sql.
+4. Rewrite every component/page file that currently holds the hardcoded sample array so it instead calls the new lib/data.ts functions (adding "use client" + useEffect/useState where needed, or fetching in a Server Component — match however the file already renders).
+
+Rules:
+- Every exported lib/data.ts function must be a complete, real implementation — no TODO, no placeholders.
+- Never use the TypeScript "any" type.
+- Only touch files that truly need it to wire up real data. Do not redesign the UI or change functionality otherwise.
+- Never touch package.json, tsconfig.json, next.config.ts, postcss.config.mjs, or .gitignore.
+
+Respond with valid JSON only: { "schema_sql": "FULL contents of supabase/schema.sql", "files": { "lib/data.ts": "FULL new file content", "...other rewritten file...": "FULL new file content" } }`;
+
+  const parsed = await generateContent(systemPrompt, "Design the schema and wire the app to it now.", geminiKey, anthropicKey);
+  if (!parsed?.schema_sql || typeof parsed.schema_sql !== "string" || !parsed.schema_sql.trim()) {
+    throw new Error("Couldn't figure out a database schema for this app's data — try asking the AI in the editor to describe what should be persisted, then try again.");
+  }
+  const next = { ...files, "supabase/schema.sql": parsed.schema_sql as string };
+  if (parsed.files && typeof parsed.files === "object" && !Array.isArray(parsed.files)) {
+    for (const [path, content] of Object.entries(parsed.files)) {
+      const normalized = String(path).replace(/^\/+/, "");
+      if (PROTECTED_PATHS.includes(normalized)) continue;
+      if (typeof content === "string" && content.length > 0) next[normalized] = content;
+    }
+  }
+  if (!next["lib/data.ts"]) {
+    throw new Error("Couldn't generate a data layer for this app's records.");
+  }
+  return { files: next };
+}
+
 function checkCrudCompleteness(dataTs: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (/\btodo\b|not implemented|placeholder/i.test(dataTs)) {
@@ -512,11 +568,17 @@ async function finishProvisioning(opts: {
   const { admin, projectId, ref, accessToken, mode, tablePrefix, geminiKey, anthropicKey } = opts;
   let files = { ...opts.files };
 
-  const rawSchema = files["supabase/schema.sql"];
+  let rawSchema = files["supabase/schema.sql"];
   if (!rawSchema) {
-    const message = "This project has no supabase/schema.sql to provision — regenerate or edit the project to include a database schema first.";
-    await markError(admin, projectId, message);
-    throw new Error(message);
+    try {
+      const synthesized = await synthesizeDataLayer(files, geminiKey, anthropicKey);
+      files = synthesized.files;
+      rawSchema = files["supabase/schema.sql"];
+    } catch (synthErr) {
+      const message = synthErr instanceof Error ? synthErr.message : "Couldn't design a database schema for this app.";
+      await markError(admin, projectId, message);
+      throw new Error(message);
+    }
   }
 
   const { sql: prefixedSql, tables } = prefixSchemaSql(rawSchema, tablePrefix);
@@ -661,9 +723,9 @@ serve(async (req) => {
     if (!project.files || typeof project.files !== "object" || Object.keys(project.files).length === 0) {
       return json({ error: "This project doesn't have a modern (Next.js) file map to provision a database into." }, 400);
     }
-    if (!project.files["supabase/schema.sql"]) {
-      return json({ error: "This project has no database schema. Ask the AI to add a database in the Editor first, then try again." }, 400);
-    }
+    // No supabase/schema.sql yet (e.g. the planner didn't flag this project as needing a
+    // database up front) is no longer a hard stop — finishProvisioning() synthesizes one
+    // from the project's existing UI/components before applying it.
 
     // --- Idempotency: short-circuit if already finished or already in flight (any mode). ---
     const { data: existing } = await admin.from("project_databases").select("*").eq("project_id", project_id).maybeSingle();
