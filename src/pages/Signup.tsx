@@ -81,8 +81,7 @@ const Signup = () => {
 
       <div className="w-full max-w-md relative z-10">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
-          <Sparkles className="h-7 w-7 text-primary" />
-          <span className="text-2xl font-display font-bold gradient-text">WebdevsAI</span>
+          <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
         </Link>
 
         <div className="glass rounded-2xl p-8">

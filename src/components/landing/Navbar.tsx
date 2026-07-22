@@ -29,9 +29,8 @@ const Navbar = () => {
       }`}
     >
       <div className="container mx-auto flex h-20 items-center justify-between px-4 lg:px-8">
-        <a href="#" className="flex items-center gap-2 text-2xl font-display font-bold tracking-tight text-gray-900">
-          Webdevs
-          <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">AI</span>
+        <a href="#" className="flex items-center gap-2">
+          <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
         </a>
 
         <div className="hidden md:flex items-center gap-8">

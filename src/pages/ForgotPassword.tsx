@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, ArrowLeft, Sparkles, CheckCircle } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const ForgotPassword = () => {
@@ -36,8 +36,7 @@ const ForgotPassword = () => {
 
       <div className="w-full max-w-md relative z-10">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
-          <Sparkles className="h-7 w-7 text-primary" />
-          <span className="text-2xl font-display font-bold gradient-text">WebdevsAI</span>
+          <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
         </Link>
 
         <div className="glass rounded-2xl p-8">

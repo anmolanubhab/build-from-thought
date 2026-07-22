@@ -77,10 +77,7 @@ const Login = () => {
 
         <div className="relative fade-up max-w-md">
           <Link to="/" className="flex items-center gap-2 mb-14">
-            <span className="text-2xl font-display font-bold text-gray-900">
-              Webdevs
-              <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">AI</span>
-            </span>
+            <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
           </Link>
 
           <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 mb-6">
@@ -127,10 +124,7 @@ const Login = () => {
 
         <div className="w-full max-w-md relative z-10">
           <Link to="/" className="flex lg:hidden items-center justify-center gap-2 mb-8">
-            <span className="text-2xl font-display font-bold text-gray-900">
-              Webdevs
-              <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">AI</span>
-            </span>
+            <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
           </Link>
 
           <div className="rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-200/50 p-8">

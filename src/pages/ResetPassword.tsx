@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Sparkles } from "lucide-react";
+import { Lock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const ResetPassword = () => {
@@ -58,8 +58,7 @@ const ResetPassword = () => {
 
       <div className="w-full max-w-md relative z-10">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <Sparkles className="h-7 w-7 text-primary" />
-          <span className="text-2xl font-display font-bold gradient-text">WebdevsAI</span>
+          <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
         </div>
 
         <div className="glass rounded-2xl p-8">

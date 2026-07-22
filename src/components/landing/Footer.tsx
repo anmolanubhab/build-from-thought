@@ -35,9 +35,7 @@ const Footer = () => (
     <div className="container mx-auto px-4">
       <div className="grid sm:grid-cols-5 gap-10">
         <div className="sm:col-span-2">
-          <span className="text-xl font-display font-bold text-gray-900">
-            Webdevs<span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">AI</span>
-          </span>
+          <img src="/logo.png" alt="WebdevsAI" className="h-8 w-auto" />
           <p className="text-sm text-gray-500 mt-3 max-w-xs leading-relaxed">
             Build production-ready web apps from a single prompt.
           </p>

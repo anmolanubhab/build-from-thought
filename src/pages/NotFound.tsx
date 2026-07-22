@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
@@ -17,8 +17,7 @@ const NotFound = () => {
 
       <div className="w-full max-w-md relative z-10 text-center">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <Sparkles className="h-7 w-7 text-primary" />
-          <span className="text-2xl font-display font-bold gradient-text">WebdevsAI</span>
+          <img src="/logo.png" alt="WebdevsAI" className="h-9 w-auto" />
         </div>
 
         <div className="glass rounded-2xl p-8">
