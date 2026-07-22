@@ -160,13 +160,16 @@
   }
 
   /* ---- Workbench design system (Dashboard) ---- */
+  /* Accent pair (--wb-ember/--wb-circuit) matches the brand's blue -> violet
+     gradient instead of the old orange/teal so the dashboard reads as the
+     same product as the marketing site and auth pages. */
   [data-wb-theme="dark"] {
     --wb-canvas: #0E1116;
     --wb-surface: #171B22;
     --wb-surface-raised: #1F2430;
     --wb-line: #262B35;
-    --wb-ember: #FF7A45;
-    --wb-circuit: #5EEAD4;
+    --wb-ember: #3B82F6;
+    --wb-circuit: #A78BFA;
     --wb-text: #ECEEF1;
     --wb-text-muted: #8A93A6;
   }
@@ -176,8 +179,8 @@
     --wb-surface: #FFFFFF;
     --wb-surface-raised: #EFEDE5;
     --wb-line: #E1DED3;
-    --wb-ember: #E8631F;
-    --wb-circuit: #0F8C7A;
+    --wb-ember: #2563EB;
+    --wb-circuit: #7C3AED;
     --wb-text: #1A1D23;
     --wb-text-muted: #6B7280;
   }
@@ -188,8 +191,8 @@
     --wb-surface: #171B22;
     --wb-surface-raised: #1F2430;
     --wb-line: #262B35;
-    --wb-ember: #FF7A45;
-    --wb-circuit: #5EEAD4;
+    --wb-ember: #3B82F6;
+    --wb-circuit: #A78BFA;
     --wb-text: #ECEEF1;
     --wb-text-muted: #8A93A6;
   }

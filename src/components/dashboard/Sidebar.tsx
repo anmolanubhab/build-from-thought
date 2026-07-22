@@ -38,6 +38,26 @@ interface SidebarProps {
   onWorkspaceChange?: (workspaceId: string) => void;
 }
 
+/** Shows the workspace's real uploaded avatar when set, otherwise a brand-gradient placeholder. */
+function WorkspaceAvatar({
+  avatarUrl,
+  boxClassName,
+  iconClassName,
+}: {
+  avatarUrl?: string | null;
+  boxClassName: string;
+  iconClassName: string;
+}) {
+  return (
+    <div
+      className={`rounded-md flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-cyan-400 bg-cover bg-center overflow-hidden ${boxClassName}`}
+      style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
+    >
+      {!avatarUrl && <Sparkles className={`text-white ${iconClassName}`} />}
+    </div>
+  );
+}
+
 const projectItems: { icon: typeof LayoutGrid; label: string; id: ProjectFilter }[] = [
   { icon: LayoutGrid, label: "All projects", id: "all" },
   { icon: Star, label: "Starred", id: "starred" },
@@ -150,9 +170,7 @@ export default function Sidebar({
                 className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:brightness-125 min-w-0"
                 style={wbSurface}
               >
-                <div className="h-6 w-6 rounded-md flex items-center justify-center" style={{ background: "var(--wb-ember)" }}>
-                  <Sparkles className="h-3.5 w-3.5 text-white" />
-                </div>
+                <WorkspaceAvatar avatarUrl={currentWorkspace?.avatar_url} boxClassName="h-6 w-6" iconClassName="h-3.5 w-3.5" />
                 <span className="wb-display text-sm font-semibold truncate flex-1 text-left" style={{ color: "var(--wb-text)" }}>
                   {currentWorkspace?.name ?? "Loading..."}
                 </span>
@@ -169,12 +187,10 @@ export default function Sidebar({
             >
               {/* Workspace Info */}
               <div className="px-3 pt-3 pb-2 flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "var(--wb-ember)" }}>
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
+                <WorkspaceAvatar avatarUrl={currentWorkspace?.avatar_url} boxClassName="h-8 w-8" iconClassName="h-4 w-4" />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate" style={{ color: "var(--wb-text)" }}>{currentWorkspace?.name ?? "Workspace"}</p>
-                  <p className="wb-mono text-[11px]" style={{ color: "var(--wb-text-muted)" }}>Free Plan</p>
+                  <p className="wb-sans text-[11px]" style={{ color: "var(--wb-text-muted)" }}>Free Plan</p>
                 </div>
               </div>
 
@@ -212,8 +228,8 @@ export default function Sidebar({
               {/* Credits */}
               <div className="px-3 pb-2">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="wb-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--wb-text-muted)" }}>Credits</span>
-                  <span className="wb-mono text-xs font-medium" style={{ color: "var(--wb-circuit)" }}>
+                  <span className="wb-sans text-[11px] uppercase tracking-wide" style={{ color: "var(--wb-text-muted)" }}>Credits</span>
+                  <span className="wb-sans text-xs font-medium" style={{ color: "var(--wb-circuit)" }}>
                     {creditsRemaining ?? "-"} / {creditsLimit ?? "-"} left
                   </span>
                 </div>
@@ -221,7 +237,7 @@ export default function Sidebar({
                   value={creditsLimit ? Math.max(0, Math.min(100, (creditsRemaining ?? 0) / creditsLimit * 100)) : 0}
                   className="h-1.5 bg-[var(--wb-surface-raised)] [&>div]:bg-[var(--wb-ember)]"
                 />
-                <p className="wb-mono text-[10px] mt-1" style={{ color: "var(--wb-text-muted)" }}>Daily credits reset at midnight UTC</p>
+                <p className="wb-sans text-[10px] mt-1" style={{ color: "var(--wb-text-muted)" }}>Daily credits reset at midnight UTC</p>
               </div>
 
               {/* Divider */}
@@ -229,7 +245,7 @@ export default function Sidebar({
 
               {/* All Workspaces */}
               <div className="px-3 pt-2 pb-1">
-                <p className="wb-mono text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--wb-text-muted)" }}>All workspaces</p>
+                <p className="wb-sans text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--wb-text-muted)" }}>All workspaces</p>
                 <div className="space-y-0.5 max-h-40 overflow-auto">
                   {workspaces.map((w) => (
                     <button
@@ -238,11 +254,9 @@ export default function Sidebar({
                       className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors hover:brightness-125"
                       style={{ background: w.id === currentWorkspaceId ? "var(--wb-surface-raised)" : "transparent" }}
                     >
-                      <div className="h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "var(--wb-ember)" }}>
-                        <Sparkles className="h-3 w-3 text-white" />
-                      </div>
+                      <WorkspaceAvatar avatarUrl={w.avatar_url} boxClassName="h-6 w-6" iconClassName="h-3 w-3" />
                       <span className="text-xs font-medium flex-1 truncate text-left" style={{ color: "var(--wb-text)" }}>{w.name}</span>
-                      <span className="wb-mono text-[10px] font-medium border rounded px-1.5 py-0.5" style={{ ...wbLine, color: "var(--wb-text-muted)" }}>
+                      <span className="wb-sans text-[10px] font-medium border rounded px-1.5 py-0.5" style={{ ...wbLine, color: "var(--wb-text-muted)" }}>
                         {w.plan.toUpperCase()}
                       </span>
                       {w.id === currentWorkspaceId && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "var(--wb-circuit)" }} />}
@@ -313,7 +327,7 @@ export default function Sidebar({
 
           {/* Projects */}
           <div>
-            <span className="px-2.5 wb-mono text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--wb-text-muted)" }}>Projects</span>
+            <span className="px-2.5 wb-sans text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--wb-text-muted)" }}>Projects</span>
             <div className="mt-1 space-y-0.5">
               {projectItems.map((item) => (
                 <button
@@ -336,7 +350,7 @@ export default function Sidebar({
           {/* Recents */}
           {recentProjects.length > 0 && (
             <div>
-              <span className="px-2.5 wb-mono text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--wb-text-muted)" }}>Recents</span>
+              <span className="px-2.5 wb-sans text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--wb-text-muted)" }}>Recents</span>
               <div className="mt-1 space-y-0.5">
                 {recentProjects.map((p) => (
                   <button
@@ -367,7 +381,7 @@ export default function Sidebar({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Share WebdevsAI</p>
-              <p className="wb-mono text-[10px]" style={{ color: "var(--wb-text-muted)" }}>5 credits per referral</p>
+              <p className="wb-sans text-[10px]" style={{ color: "var(--wb-text-muted)" }}>5 credits per referral</p>
             </div>
           </div>
 
@@ -381,7 +395,7 @@ export default function Sidebar({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Upgrade to Pro</p>
-              <p className="wb-mono text-[10px]" style={{ color: "var(--wb-text-muted)" }}>Unlock more benefits</p>
+              <p className="wb-sans text-[10px]" style={{ color: "var(--wb-text-muted)" }}>Unlock more benefits</p>
             </div>
           </div>
 
