@@ -28,12 +28,24 @@ export async function connectSupabaseWithToken(personalAccessToken: string): Pro
 
 /** Picks which of the user's Supabase projects this workspace should use. */
 export async function selectSupabaseProject(ref: string, name: string): Promise<void> {
-  const { error } = await supabase
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (userError || !userId) {
+    throw new Error("Your session looks expired — refresh the page and try again.");
+  }
+  // .select() so a silently-blocked update (permissions, RLS, or the row not existing)
+  // surfaces as a real error instead of a false "saved" outcome — see disconnectSupabase()
+  // for the same pattern and why it matters.
+  const { data, error } = await supabase
     .from("supabase_connections")
     .update({ project_ref: ref, project_name: name } as any)
-    .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "");
+    .eq("user_id", userId)
+    .select("user_id");
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error("Couldn't save your project selection — try reconnecting from Resources → Connectors.");
+  }
 }
 
 export async function getSupabaseConnectionStatus(): Promise<SupabaseConnectionStatus> {
@@ -48,8 +60,22 @@ export async function getSupabaseConnectionStatus(): Promise<SupabaseConnectionS
 }
 
 export async function disconnectSupabase(): Promise<void> {
-  const userId = (await supabase.auth.getUser()).data.user?.id;
-  if (!userId) return;
-  const { error } = await supabase.from("supabase_connections").delete().eq("user_id", userId);
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (userError || !userId) {
+    throw new Error("Your session looks expired — refresh the page and try again.");
+  }
+  // .select() so we get back the row(s) actually removed: a DELETE that matches zero
+  // rows (RLS denies it, the row is already gone, whatever the reason) succeeds with no
+  // error and an empty result — silently telling the caller "disconnected" when nothing
+  // changed. Checking the returned rows turns that into a real, visible failure instead.
+  const { data, error } = await supabase
+    .from("supabase_connections")
+    .delete()
+    .eq("user_id", userId)
+    .select("user_id");
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error("Couldn't disconnect — no active Supabase connection was found to remove. Try refreshing the page.");
+  }
 }
