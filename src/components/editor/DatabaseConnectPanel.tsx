@@ -160,9 +160,6 @@ export default function DatabaseConnectPanel({ projectId, needsDatabase, onProvi
     }
   };
 
-  // Nothing to show: plan doesn't need a database and nothing has ever been provisioned.
-  if (!needsDatabase && !db) return null;
-
   if (phase === "ready" && db) {
     return (
       <div className="border-b border-gray-200 bg-white">
@@ -222,18 +219,44 @@ export default function DatabaseConnectPanel({ projectId, needsDatabase, onProvi
     );
   }
 
+  // The AI's plan flags some apps as needing a database (bookings, CRMs, etc.) — those
+  // get the attention-grabbing amber "this app needs a database" treatment. Everything
+  // else still gets the same Connect Database flow, just as a low-key optional action
+  // (neutral colors, no "needs" language) so users can opt into persistence on any
+  // project, not only the ones the planner happened to flag.
+  const required = needsDatabase;
+  const theme = required
+    ? {
+        wrap: "bg-amber-50/60",
+        icon: "text-amber-600",
+        label: "text-amber-900",
+        cta: "text-white bg-amber-600 hover:bg-amber-700",
+        optionBorder: "border-amber-200",
+        optionIcon: "text-amber-600",
+      }
+    : {
+        wrap: "bg-slate-50/60",
+        icon: "text-slate-500",
+        label: "text-slate-700",
+        cta: "text-slate-700 bg-white border border-gray-300 hover:bg-gray-50",
+        optionBorder: "border-gray-200",
+        optionIcon: "text-slate-500",
+      };
+
   return (
-    <div className="border-b border-gray-200 bg-amber-50/60 px-3 py-2.5">
+    <div className={`border-b border-gray-200 ${theme.wrap} px-3 py-2.5`}>
       <div className="flex items-center gap-2">
-        <Database className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-        <span className="text-xs font-medium text-amber-900">This app needs a database</span>
+        <Database className={`h-3.5 w-3.5 ${theme.icon} flex-shrink-0`} />
+        <span className={`text-xs font-medium ${theme.label}`}>
+          {required ? "This app needs a database" : "Want to save real data? Add a database"}
+        </span>
         <div className="flex-1" />
         {phase !== "choosing" && (
           <button
             onClick={() => setPhase("choosing")}
-            className="text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-700 px-2.5 py-1 rounded-md transition-colors"
+            className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors ${theme.cta}`}
           >
-            Connect Database
+            {required ? "Connect Database" : "Add Database"}
           </button>
         )}
       </div>
@@ -264,16 +287,16 @@ export default function DatabaseConnectPanel({ projectId, needsDatabase, onProvi
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             onClick={() => handleChoose("shared")}
-            className="flex flex-col items-start gap-1 rounded-lg border border-amber-200 bg-white hover:bg-amber-50 p-2.5 text-left transition-colors"
+            className={`flex flex-col items-start gap-1 rounded-lg border ${theme.optionBorder} bg-white hover:bg-gray-50 p-2.5 text-left transition-colors`}
           >
-            <span className="flex items-center gap-1 text-xs font-semibold text-gray-900"><Zap className="h-3 w-3 text-amber-600" /> Existing Project</span>
+            <span className={`flex items-center gap-1 text-xs font-semibold text-gray-900`}><Zap className={`h-3 w-3 ${theme.optionIcon}`} /> Existing Project</span>
             <span className="text-[10px] text-gray-500">Fast — reuses your connected Supabase project. Ready instantly.</span>
           </button>
           <button
             onClick={() => handleChoose("dedicated")}
-            className="flex flex-col items-start gap-1 rounded-lg border border-amber-200 bg-white hover:bg-amber-50 p-2.5 text-left transition-colors"
+            className={`flex flex-col items-start gap-1 rounded-lg border ${theme.optionBorder} bg-white hover:bg-gray-50 p-2.5 text-left transition-colors`}
           >
-            <span className="flex items-center gap-1 text-xs font-semibold text-gray-900"><Server className="h-3 w-3 text-amber-600" /> New Dedicated Project</span>
+            <span className={`flex items-center gap-1 text-xs font-semibold text-gray-900`}><Server className={`h-3 w-3 ${theme.optionIcon}`} /> New Dedicated Project</span>
             <span className="text-[10px] text-gray-500">Production — its own isolated Supabase project. Takes ~1-2 min.</span>
           </button>
         </div>
