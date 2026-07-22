@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Code, Eye, Monitor, Smartphone, Tablet } from "lucide-react";
+import { Monitor, Smartphone, Tablet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PageData } from "@/lib/projects";
 import LivePreview from "@/components/editor/LivePreview";
@@ -9,7 +9,7 @@ interface PreviewPanelProps {
   css: string;
   title: string;
   pages?: PageData[];
-  /** Full Next.js file map for modern projects — enables the file browser in Code view. */
+  /** Full Next.js file map for modern projects — the file browser now lives in the top-level "Code" tab (CodeView), not here. */
   files?: Record<string, string> | null;
   previewChanges?: { summary: string; changes: string[]; html: string; css: string; pages?: PageData[]; files?: Record<string, string> | null } | null;
   onAcceptPreview?: () => void;
@@ -22,7 +22,6 @@ interface PreviewPanelProps {
   onFixPreviewError?: (errorMessage: string, logTail: string) => Promise<boolean>;
 }
 
-type ViewMode = "preview" | "code";
 type DeviceMode = "desktop" | "tablet" | "mobile";
 
 const DEVICE_WIDTHS: Record<DeviceMode, string> = {
@@ -35,23 +34,17 @@ export default function PreviewPanel({
   html, css, title, pages, files, previewChanges, onAcceptPreview, onRejectPreview,
   projectId, versionId, onFixPreviewError,
 }: PreviewPanelProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [activePage, setActivePage] = useState(0);
-  const [activeFile, setActiveFile] = useState<string | null>(null);
 
   // Determine which pages to show
   const displayPages = previewChanges?.pages ?? pages ?? [{ name: "index", title: "Home", html: html }];
   const displayCss = previewChanges?.css ?? css;
   const isMultipage = displayPages.length > 1;
 
-  // Modern projects: full file map for the Code view
+  // Modern projects: full file map indicates a live-preview-capable project.
   const displayFiles = previewChanges?.files ?? files ?? null;
-  const filePaths = displayFiles ? Object.keys(displayFiles).sort() : [];
-  const isModern = filePaths.length > 0;
-  const currentFile = activeFile && displayFiles?.[activeFile] !== undefined
-    ? activeFile
-    : (filePaths.includes("app/page.tsx") ? "app/page.tsx" : filePaths[0] ?? null);
+  const isModern = !!displayFiles && Object.keys(displayFiles).length > 0;
 
   // Clamp active page
   const currentPageIndex = Math.min(activePage, displayPages.length - 1);
@@ -95,28 +88,6 @@ export default function PreviewPanel({
               <Icon className="h-3.5 w-3.5" />
             </button>
           ))}
-        </div>
-
-        {/* View toggle */}
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
-          <button
-            onClick={() => setViewMode("preview")}
-            className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors",
-              viewMode === "preview" ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600"
-            )}
-          >
-            <Eye className="h-3 w-3" /> Preview
-          </button>
-          <button
-            onClick={() => setViewMode("code")}
-            className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors",
-              viewMode === "code" ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600"
-            )}
-          >
-            <Code className="h-3 w-3" /> Code
-          </button>
         </div>
       </div>
 
@@ -165,78 +136,26 @@ export default function PreviewPanel({
       )}
 
       {/* Content */}
-      <div className={cn("flex-1 overflow-auto bg-gray-100 flex items-start justify-center", viewMode === "preview" && isModern && !previewChanges && projectId ? "p-0" : "p-4")}>
-        {viewMode === "preview" ? (
-          isModern && !previewChanges && projectId ? (
-            // Real, live Next.js preview — replaces the static HTML approximation for
-            // modern projects. Falls back to the static render below only while an
-            // unsaved "suggest" diff is being previewed (previewChanges), since that
-            // content hasn't been persisted for the sandbox to pull yet.
-            <div className="w-full h-full bg-white">
-              <LivePreview projectId={projectId} versionId={versionId} files={files ?? null} onFixErrors={onFixPreviewError} />
-            </div>
-          ) : (
-            <div
-              className="bg-white rounded-lg shadow-sm overflow-hidden transition-all duration-300"
-              style={{ width: DEVICE_WIDTHS[device], maxWidth: "100%", height: "100%" }}
-            >
-              <iframe
-                srcDoc={fullPage}
-                className="w-full h-full border-0"
-                title="Project preview"
-                sandbox="allow-scripts"
-              />
-            </div>
-          )
-        ) : isModern ? (
-          <div className="w-full h-full flex gap-3">
-            {/* File tree */}
-            <div className="w-56 shrink-0 bg-white rounded-xl border border-gray-200 overflow-y-auto">
-              <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                Project files ({filePaths.length})
-              </p>
-              <div className="pb-2">
-                {filePaths.map((path) => (
-                  <button
-                    key={path}
-                    onClick={() => setActiveFile(path)}
-                    className={cn(
-                      "w-full text-left px-3 py-1.5 text-xs font-mono truncate transition-colors",
-                      currentFile === path
-                        ? "bg-gray-100 text-gray-900 font-medium"
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                    )}
-                    title={path}
-                  >
-                    {path}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* File content */}
-            <div className="flex-1 min-w-0 flex flex-col">
-              <p className="text-xs font-mono text-gray-500 mb-2 px-1 truncate">{currentFile}</p>
-              <pre className="flex-1 bg-gray-900 text-gray-100 rounded-xl p-4 text-xs overflow-auto font-mono leading-relaxed">
-                {(currentFile && displayFiles?.[currentFile]) || "// Empty file"}
-              </pre>
-            </div>
+      <div className={cn("flex-1 overflow-auto bg-gray-100 flex items-start justify-center", isModern && !previewChanges && projectId ? "p-0" : "p-4")}>
+        {isModern && !previewChanges && projectId ? (
+          // Real, live Next.js preview — replaces the static HTML approximation for
+          // modern projects. Falls back to the static render below only while an
+          // unsaved "suggest" diff is being previewed (previewChanges), since that
+          // content hasn't been persisted for the sandbox to pull yet.
+          <div className="w-full h-full bg-white">
+            <LivePreview projectId={projectId} versionId={versionId} files={files ?? null} onFixErrors={onFixPreviewError} />
           </div>
         ) : (
-          <div className="w-full max-w-4xl space-y-4">
-            <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">
-                {isMultipage ? `HTML — ${currentPage?.title || currentPage?.name}` : "HTML"}
-              </h3>
-              <pre className="bg-gray-900 text-gray-100 rounded-xl p-4 text-xs overflow-auto max-h-[300px] font-mono leading-relaxed">
-                {currentHtml || "<!-- No HTML -->"}
-              </pre>
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">CSS (shared)</h3>
-              <pre className="bg-gray-900 text-gray-100 rounded-xl p-4 text-xs overflow-auto max-h-[300px] font-mono leading-relaxed">
-                {displayCss || "/* No CSS */"}
-              </pre>
-            </div>
+          <div
+            className="bg-white rounded-lg shadow-sm overflow-hidden transition-all duration-300"
+            style={{ width: DEVICE_WIDTHS[device], maxWidth: "100%", height: "100%" }}
+          >
+            <iframe
+              srcDoc={fullPage}
+              className="w-full h-full border-0"
+              title="Project preview"
+              sandbox="allow-scripts"
+            />
           </div>
         )}
       </div>

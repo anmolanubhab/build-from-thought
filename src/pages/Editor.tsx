@@ -1,13 +1,13 @@
 // path: src/pages/Editor.tsx
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Menu, X, History, RefreshCw, Rocket, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { editProject, EditResult } from "@/services/edit";
 import type { Project, PageData } from "@/lib/projects";
-import { getProjectPages } from "@/lib/projects";
+import { getProjectPages, isModernProject } from "@/lib/projects";
 import {
   fetchOpenDraft, createDraft, updateDraft, discardDraft, publishVersion,
   type ProjectVersion,
@@ -15,8 +15,13 @@ import {
 import { syncPreview, startPreview } from "@/services/preview";
 import PromptPanel, { PromptEntry } from "@/components/editor/PromptPanel";
 import PreviewPanel from "@/components/editor/PreviewPanel";
+import CodeView from "@/components/editor/CodeView";
 import VersionHistoryDialog from "@/components/editor/VersionHistoryDialog";
 import DatabaseConnectPanel from "@/components/editor/DatabaseConnectPanel";
+import ProjectTopNav, { type ProjectTab } from "@/components/editor/ProjectTopNav";
+import DeployPanel from "@/components/editor/DeployPanel";
+import ProjectSettingsPanel from "@/components/editor/ProjectSettingsPanel";
+import DocumentationWorkspace from "@/components/documentation/DocumentationWorkspace";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ProjectSnapshot {
@@ -59,6 +64,15 @@ export default function Editor() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get("tab") as ProjectTab) || "preview";
+  const setActiveTab = (tab: ProjectTab) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tab);
+      return next;
+    });
+  };
 
   const [project, setProject] = useState<Project | null>(null);
   const [liveSnapshot, setLiveSnapshot] = useState<ProjectSnapshot | null>(null);
@@ -315,6 +329,26 @@ export default function Editor() {
     toast({ title: "Database connected", description: summary });
   };
 
+  /** Wired into the Documentation workspace's "Sync into project files" export
+   *  action (currently just README.md) — writes generated documentation content
+   *  straight into the project's own file map so the next GitHub push / ZIP
+   *  download carries it too. Only meaningful for modern (file-map) projects. */
+  const handleSyncFileToProject = async (path: string, content: string, summary: string) => {
+    if (!project || !isModernProject(project)) {
+      toast({ title: "Can't sync into project files", description: "This project doesn't have a modern file structure to sync into.", variant: "destructive" });
+      return;
+    }
+    setUndoStack((prev) => [
+      ...prev,
+      { html: project.html || "", css: project.css || "", react_code: project.react_code || "", pages: project.pages, files: project.files ?? null },
+    ]);
+    const nextFiles = { ...(project.files ?? {}), [path]: content };
+    const updated: Project = { ...project, files: nextFiles };
+    setProject(updated);
+    await saveDraft(project.html || "", project.css || "", project.react_code || "", project.pages, summary, nextFiles);
+    toast({ title: "Synced", description: summary });
+  };
+
   const handleRolledBack = async () => {
     if (!id || !user) return;
     const { data } = await supabase.from("projects").select("*").eq("id", id).eq("user_id", user.id).single();
@@ -394,38 +428,68 @@ export default function Editor() {
         </div>
       )}
 
-      <DatabaseConnectPanel
-        projectId={project.id}
-        needsDatabase={Boolean((project.plan as { needs_database?: boolean } | null | undefined)?.needs_database)}
-        onProvisioned={handleDatabaseProvisioned}
-      />
+      <ProjectTopNav active={activeTab} onChange={setActiveTab} />
 
-      <div className="flex-1 flex overflow-hidden relative">
-        <div className={`${isMobile ? "absolute inset-0 z-30" : "w-[360px] flex-shrink-0 border-r border-gray-200"} ${isMobile && !panelOpen ? "hidden" : ""} transition-all`}>
-          <PromptPanel history={history} loading={editing} onSubmit={handleSubmit} onUndo={handleUndo} canUndo={undoStack.length > 0} suggestionsEnabled={prefs?.chat_suggestions_enabled ?? true} />
+      {(activeTab === "preview" || activeTab === "code") && (
+        <DatabaseConnectPanel
+          projectId={project.id}
+          needsDatabase={Boolean((project.plan as { needs_database?: boolean } | null | undefined)?.needs_database)}
+          onProvisioned={handleDatabaseProvisioned}
+        />
+      )}
+
+      {activeTab === "preview" && (
+        <div className="flex-1 flex overflow-hidden relative">
+          <div className={`${isMobile ? "absolute inset-0 z-30" : "w-[360px] flex-shrink-0 border-r border-gray-200"} ${isMobile && !panelOpen ? "hidden" : ""} transition-all`}>
+            <PromptPanel history={history} loading={editing} onSubmit={handleSubmit} onUndo={handleUndo} canUndo={undoStack.length > 0} suggestionsEnabled={prefs?.chat_suggestions_enabled ?? true} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <PreviewPanel
+              html={project.html || ""}
+              css={project.css || ""}
+              title={project.title}
+              pages={pages}
+              files={project.files ?? null}
+              previewChanges={previewChanges ? {
+                summary: previewChanges.summary,
+                changes: previewChanges.changes,
+                html: previewChanges.html,
+                css: previewChanges.css,
+                files: previewChanges.files ?? null,
+              } : null}
+              onAcceptPreview={handleAcceptPreview}
+              onRejectPreview={() => setPreviewChanges(null)}
+              projectId={project.id}
+              versionId={draft?.id ?? null}
+              onFixPreviewError={handleFixPreviewError}
+            />
+          </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <PreviewPanel
-            html={project.html || ""}
-            css={project.css || ""}
-            title={project.title}
-            pages={pages}
-            files={project.files ?? null}
-            previewChanges={previewChanges ? {
-              summary: previewChanges.summary,
-              changes: previewChanges.changes,
-              html: previewChanges.html,
-              css: previewChanges.css,
-              files: previewChanges.files ?? null,
-            } : null}
-            onAcceptPreview={handleAcceptPreview}
-            onRejectPreview={() => setPreviewChanges(null)}
-            projectId={project.id}
-            versionId={draft?.id ?? null}
-            onFixPreviewError={handleFixPreviewError}
-          />
+      )}
+
+      {activeTab === "code" && (
+        <div className="flex-1 overflow-hidden">
+          <CodeView html={project.html || ""} css={project.css || ""} pages={pages} files={project.files ?? null} />
         </div>
-      </div>
+      )}
+
+      {activeTab === "documentation" && (
+        <div className="flex-1 overflow-hidden">
+          <DocumentationWorkspace project={project} onSyncFileToProject={handleSyncFileToProject} />
+        </div>
+      )}
+
+      {activeTab === "deploy" && (
+        <div className="flex-1 overflow-hidden">
+          <DeployPanel project={project} onUpdate={(updated) => setProject(updated)} />
+        </div>
+      )}
+
+      {activeTab === "settings" && (
+        <div className="flex-1 overflow-hidden">
+          <ProjectSettingsPanel project={project} onUpdate={(updated) => setProject(updated)} />
+        </div>
+      )}
 
       <VersionHistoryDialog
         open={historyOpen}
