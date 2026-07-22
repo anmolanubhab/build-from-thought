@@ -169,6 +169,116 @@ export type Database = {
         }
         Relationships: []
       }
+      documentation_sections: {
+        Row: {
+          content_json: Json | null
+          content_md: string
+          created_at: string
+          generated_at: string | null
+          has_manual_edits: boolean
+          id: string
+          project_id: string
+          section_key: string
+          source: string
+          source_fingerprint: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_json?: Json | null
+          content_md?: string
+          created_at?: string
+          generated_at?: string | null
+          has_manual_edits?: boolean
+          id?: string
+          project_id: string
+          section_key: string
+          source?: string
+          source_fingerprint?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content_json?: Json | null
+          content_md?: string
+          created_at?: string
+          generated_at?: string | null
+          has_manual_edits?: boolean
+          id?: string
+          project_id?: string
+          section_key?: string
+          source?: string
+          source_fingerprint?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentation_sections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documentation_section_versions: {
+        Row: {
+          content_json: Json | null
+          content_md: string
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          section_id: string
+          section_key: string
+          source: string
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          content_json?: Json | null
+          content_md?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          section_id: string
+          section_key: string
+          source?: string
+          summary?: string | null
+          title?: string
+        }
+        Update: {
+          content_json?: Json | null
+          content_md?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          section_id?: string
+          section_key?: string
+          source?: string
+          summary?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentation_section_versions_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "documentation_sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentation_section_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       github_tokens: {
         Row: {
           access_token: string

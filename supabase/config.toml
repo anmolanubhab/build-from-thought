@@ -4,6 +4,9 @@ project_id = "pclbntueuigcsaxsixeu"
 [functions.generate-app]
 verify_jwt = true
 
+[functions.generate-documentation]
+verify_jwt = true
+
 [functions.github-auth]
 verify_jwt = false
 
