@@ -66,7 +66,7 @@ const DashboardSettings = () => {
 
   const goTo = (id: SectionId) => setSearchParams({ section: id });
 
-  const nav: { group?: string; items: { id: SectionId; label: string; icon: typeof User }[] }[] = [
+  const nav: { group?: string; items: { id: SectionId; label: string; icon: typeof User; badge?: string }[] }[] = [
     { items: [
       { id: "account", label: user?.name || "Account", icon: User },
       { id: "devices", label: "Devices & Apps", icon: Laptop },
@@ -77,7 +77,7 @@ const DashboardSettings = () => {
     ] },
     { group: "Access", items: [
       { id: "people", label: "People", icon: Users },
-      { id: "groups", label: "Groups", icon: UsersRound },
+      { id: "groups", label: "Groups", icon: UsersRound, badge: "Business" },
       { id: "identity", label: "Identity", icon: Fingerprint },
     ] },
     { group: "Customization", items: [
@@ -111,10 +111,7 @@ const DashboardSettings = () => {
       if (!currentWorkspace) return null;
       return <PeopleSection workspace={currentWorkspace} currentUserId={user?.id} />;
     }
-    if (section === "groups") {
-      if (!currentWorkspace) return null;
-      return <GroupsSection workspace={currentWorkspace} currentUserId={user?.id} />;
-    }
+    if (section === "groups") return <GroupsSection />;
     if (section === "identity") return <IdentitySection />;
     if (section === "knowledge") {
       if (!currentWorkspace) return null;
@@ -153,7 +150,8 @@ const DashboardSettings = () => {
     return null;
   };
 
-  const activeLabel = nav.flatMap((g) => g.items).find((i) => i.id === section)?.label ?? "Settings";
+  const activeItem = nav.flatMap((g) => g.items).find((i) => i.id === section);
+  const activeLabel = activeItem?.label ?? "Settings";
 
   return (
     <div className="min-h-screen bg-gray-50/60 flex">
@@ -180,7 +178,12 @@ const DashboardSettings = () => {
                     }`}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
+                    <span className="truncate flex-1">{item.label}</span>
+                    {item.badge && (
+                      <span className="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                        {item.badge}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -195,7 +198,14 @@ const DashboardSettings = () => {
           <Link to="/dashboard" className="md:hidden inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6">
             <ArrowLeft className="h-3.5 w-3.5" /> Go back
           </Link>
-          <h1 className="font-display text-xl font-bold text-gray-900 mb-6">{activeLabel}</h1>
+          <h1 className="font-display text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            {activeLabel}
+            {activeItem?.badge && (
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                {activeItem.badge}
+              </span>
+            )}
+          </h1>
           {renderSection()}
         </div>
       </main>
