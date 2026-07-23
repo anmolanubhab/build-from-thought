@@ -13,6 +13,7 @@ export type ProjectFiles = Record<string, string>;
 export interface Project {
   id: string;
   user_id: string;
+  workspace_id?: string;
   title: string;
   type: ProjectType;
   prompt: string;
@@ -31,6 +32,9 @@ export interface Project {
   plan?: Record<string, unknown> | null;
   view_count: number;
   created_at: string;
+  updated_at?: string;
+  /** Free-text folder label the user filed this project under. Null = unfiled. */
+  folder?: string | null;
 }
 
 /** True when the project carries a full modern (Next.js) file map. */

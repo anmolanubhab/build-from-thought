@@ -10,6 +10,9 @@ import { isProjectPinned, toggleProjectPinned } from "@/lib/pinnedProjects";
 import { Pencil, MoreHorizontal } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProjectActionMenu } from "./ProjectActionMenu";
+import MoveToFolderDialog from "./MoveToFolderDialog";
+import ProjectAnalyticsDialog from "./ProjectAnalyticsDialog";
+import ProjectActivityDialog from "./ProjectActivityDialog";
 
 const typeLabels: Record<string, string> = {
   portfolio: "Portfolio",
@@ -45,6 +48,9 @@ export default function ProjectCard({ project, onOpen, onDelete, onProjectUpdate
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.title);
   const [busyAction, setBusyAction] = useState<"remix" | "duplicate" | null>(null);
+  const [movingFolder, setMovingFolder] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
 
   useEffect(() => {
     if (!renaming) setRenameValue(project.title);
@@ -320,7 +326,7 @@ export default function ProjectCard({ project, onOpen, onDelete, onProjectUpdate
             onOpenLivePreview={handleOpenLivePreview}
             onPreviewMobile={() => onOpen(project, { tab: "preview", device: "mobile" })}
             onRename={() => setRenaming(true)}
-            onMoveToFolder={() => toast({ title: "Folders coming soon", description: "Project folders aren't built yet." })}
+            onMoveToFolder={() => setMovingFolder(true)}
             onToggleStar={handleToggleStar}
             onTogglePin={handleTogglePin}
             onRemix={handleRemix}
@@ -330,16 +336,23 @@ export default function ProjectCard({ project, onOpen, onDelete, onProjectUpdate
             onShare={handleShare}
             onCopyLink={handleCopyLink}
             onTogglePublish={handleTogglePublish}
-            onAnalytics={() => toast({ title: "Analytics coming soon", description: "Per-project analytics isn't built yet." })}
-            onActivity={() => {
-              toast({ title: "Opening workspace activity", description: "This shows activity for the whole workspace, not just this project." });
-              navigate("/dashboard/settings?section=audit-logs");
-            }}
+            onAnalytics={() => setShowAnalytics(true)}
+            onActivity={() => setShowActivity(true)}
             onSettings={() => navigate(`/editor/${project.id}?tab=settings`)}
             onDelete={() => onDelete?.(project.id)}
           />
         </div>
       </div>
+
+      <MoveToFolderDialog
+        open={movingFolder}
+        onClose={() => setMovingFolder(false)}
+        project={project}
+        workspaceId={project.workspace_id ?? null}
+        onMoved={(updated) => onProjectUpdate?.(updated)}
+      />
+      <ProjectAnalyticsDialog open={showAnalytics} onClose={() => setShowAnalytics(false)} project={project} />
+      <ProjectActivityDialog open={showActivity} onClose={() => setShowActivity(false)} project={project} />
     </div>
   );
 }

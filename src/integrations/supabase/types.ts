@@ -748,6 +748,7 @@ export type Database = {
           css: string | null
           deployed_url: string | null
           files: Json | null
+          folder: string | null
           html: string | null
           id: string
           is_multipage: boolean
@@ -771,6 +772,7 @@ export type Database = {
           css?: string | null
           deployed_url?: string | null
           files?: Json | null
+          folder?: string | null
           html?: string | null
           id?: string
           is_multipage?: boolean
@@ -794,6 +796,7 @@ export type Database = {
           css?: string | null
           deployed_url?: string | null
           files?: Json | null
+          folder?: string | null
           html?: string | null
           id?: string
           is_multipage?: boolean

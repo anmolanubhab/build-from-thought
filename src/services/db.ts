@@ -40,7 +40,7 @@ export async function insertProject(project: {
   return data as unknown as Project;
 }
 
-export async function updateProject(id: string, updates: Partial<Pick<Project, "deployed_url" | "is_public" | "is_starred" | "title">> & { pages?: PageData[] | null; is_multipage?: boolean }): Promise<Project> {
+export async function updateProject(id: string, updates: Partial<Pick<Project, "deployed_url" | "is_public" | "is_starred" | "title" | "folder">> & { pages?: PageData[] | null; is_multipage?: boolean }): Promise<Project> {
   const { data, error } = await supabase
     .from("projects")
     .update(updates as any)
@@ -54,6 +54,26 @@ export async function updateProject(id: string, updates: Partial<Pick<Project, "
 
 export async function toggleStar(id: string, is_starred: boolean): Promise<Project> {
   return updateProject(id, { is_starred });
+}
+
+/** Distinct, non-null folder labels already in use across a workspace's projects — feeds the "Move to Folder" picker. */
+export async function fetchWorkspaceFolders(workspaceId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("folder")
+    .eq("workspace_id", workspaceId)
+    .not("folder", "is", null);
+
+  if (error) throw new Error(error.message);
+  const folders = new Set<string>();
+  for (const row of (data ?? []) as { folder: string | null }[]) {
+    if (row.folder) folders.add(row.folder);
+  }
+  return [...folders].sort((a, b) => a.localeCompare(b));
+}
+
+export async function moveProjectToFolder(id: string, folder: string | null): Promise<Project> {
+  return updateProject(id, { folder });
 }
 
 export interface ProfileCredits {
