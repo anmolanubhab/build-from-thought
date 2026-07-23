@@ -16,8 +16,8 @@ interface Props {
   onClose: () => void;
   /** Use the light landing/settings palette instead of the dark Workbench one. */
   light?: boolean;
-  /** Which plan this waitlist signup is for; also stored on the plan_interest row. */
-  plan?: "pro" | "business";
+  /** Which plan this waitlist/contact signup is for; also stored on the plan_interest row. */
+  plan?: "pro" | "business" | "enterprise";
 }
 
 export default function UpgradeDialog({ open, onClose, light = false, plan = "pro" }: Props) {
@@ -25,7 +25,8 @@ export default function UpgradeDialog({ open, onClose, light = false, plan = "pr
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const planLabel = plan === "business" ? "Business" : "Pro";
+  const planLabel = plan === "business" ? "Business" : plan === "enterprise" ? "Enterprise" : "Pro";
+  const isEnterprise = plan === "enterprise";
 
   const colors = light
     ? { text: "#111827", muted: "#6B7280", accent: "#2563EB", success: "#10b981", surface: "#FFFFFF", line: "#E5E7EB" }
@@ -71,9 +72,13 @@ export default function UpgradeDialog({ open, onClose, light = false, plan = "pr
         {submitted ? (
           <div className="py-6 text-center space-y-3">
             <CheckCircle className="h-10 w-10 mx-auto" style={{ color: colors.success }} />
-            <p className="font-semibold" style={{ color: colors.text }}>You're on the waitlist!</p>
+            <p className="font-semibold" style={{ color: colors.text }}>
+              {isEnterprise ? "Thanks — we'll be in touch!" : "You're on the waitlist!"}
+            </p>
             <p className="text-sm" style={{ color: colors.muted }}>
-              We'll email you at {email} as soon as {planLabel} plans are available.
+              {isEnterprise
+                ? `Our team will reach out to ${email} to talk through Enterprise pricing.`
+                : `We'll email you at ${email} as soon as ${planLabel} plans are available.`}
             </p>
             <Button onClick={handleClose} className={`mt-2 ${light ? "bg-blue-600 text-white hover:bg-blue-700" : ""}`}>Close</Button>
           </div>
@@ -81,10 +86,13 @@ export default function UpgradeDialog({ open, onClose, light = false, plan = "pr
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2" style={{ color: colors.text }}>
-                <Zap className="h-4 w-4" style={{ color: colors.accent }} /> Join the {planLabel} waitlist
+                <Zap className="h-4 w-4" style={{ color: colors.accent }} />
+                {isEnterprise ? "Talk to sales" : `Join the ${planLabel} waitlist`}
               </DialogTitle>
               <DialogDescription style={{ color: colors.muted }}>
-                {planLabel} billing isn't live yet — leave your email and we'll notify you the moment it launches.
+                {isEnterprise
+                  ? "Enterprise plans are set up per organization — leave your email and our team will reach out."
+                  : `${planLabel} billing isn't live yet — leave your email and we'll notify you the moment it launches.`}
               </DialogDescription>
             </DialogHeader>
 
@@ -107,7 +115,7 @@ export default function UpgradeDialog({ open, onClose, light = false, plan = "pr
                 disabled={submitting || !email.trim()}
                 className={light ? "bg-blue-600 text-white hover:bg-blue-700" : undefined}
               >
-                {submitting ? "Submitting..." : "Join Waitlist"}
+                {submitting ? "Submitting..." : isEnterprise ? "Request Contact" : "Join Waitlist"}
               </Button>
             </DialogFooter>
           </>

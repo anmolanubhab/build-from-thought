@@ -7,13 +7,64 @@ import { Button } from "@/components/ui/button";
 import SettingsCard from "./SettingsCard";
 import UpgradeDialog from "@/components/dashboard/UpgradeDialog";
 import { PremiumAnimatedCard } from "@/components/ui/PremiumAnimatedCard";
-import { Zap } from "lucide-react";
+import { Check, Zap } from "lucide-react";
+
+type PlanId = "free" | "pro" | "business" | "enterprise";
+
+interface Plan {
+  id: PlanId;
+  name: string;
+  price: string;
+  period: string;
+  tagline: string;
+  credits: string;
+  features: string[];
+}
+
+const PLANS: Plan[] = [
+  {
+    id: "free",
+    name: "Free",
+    price: "$0",
+    period: "/month",
+    tagline: "Discover what you can build for free.",
+    credits: "5 credits / day",
+    features: ["Workspace-private projects", "Unlimited collaborators", "Community support"],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "$25",
+    period: "/month",
+    tagline: "For fast-moving teams building together.",
+    credits: "Higher daily credit limit",
+    features: ["All Free features", "Per-member credit limits", "Custom domains", "Email support"],
+  },
+  {
+    id: "business",
+    name: "Business",
+    price: "$50",
+    period: "/month",
+    tagline: "Advanced controls for growing teams.",
+    credits: "Higher daily credit limit",
+    features: ["All Pro features", "Groups & role-based access", "SSO", "Priority support"],
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: "Custom",
+    period: "",
+    tagline: "For large orgs needing scale and governance.",
+    credits: "Volume-based credits",
+    features: ["All Business features", "Dedicated support", "Audit logs", "SCIM"],
+  },
+];
 
 export default function PlansSection() {
   const { user } = useAuth();
   const [creditsRemaining, setCreditsRemaining] = useState<number>();
   const [creditsLimit, setCreditsLimit] = useState<number>();
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradePlan, setUpgradePlan] = useState<"pro" | "business" | "enterprise" | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -21,6 +72,8 @@ export default function PlansSection() {
       .then((c) => { setCreditsRemaining(c.credits_remaining); setCreditsLimit(c.credits_daily_limit); })
       .catch(() => {});
   }, [user?.id]);
+
+  const currentPlan: PlanId = "free";
 
   return (
     <div className="space-y-5">
@@ -31,7 +84,7 @@ export default function PlansSection() {
             <p className="text-xs text-gray-500 mt-0.5">Free — Pro billing isn't live yet</p>
           </div>
           <PremiumAnimatedCard radiusClassName="rounded-md">
-            <Button onClick={() => setUpgradeOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700 gap-1.5">
+            <Button onClick={() => setUpgradePlan("pro")} className="bg-blue-600 text-white hover:bg-blue-700 gap-1.5">
               <Zap className="h-3.5 w-3.5" /> Upgrade to Pro
             </Button>
           </PremiumAnimatedCard>
@@ -52,7 +105,63 @@ export default function PlansSection() {
         </div>
       </SettingsCard>
 
-      <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} light />
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Plans</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {PLANS.map((plan) => {
+            const isCurrent = plan.id === currentPlan;
+            return (
+              <SettingsCard
+                key={plan.id}
+                className={`flex flex-col ${isCurrent ? "ring-2 ring-blue-600" : ""}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-sm font-semibold text-gray-900">{plan.name}</h4>
+                  {isCurrent && (
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+                      Current
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mb-3 min-h-[2rem]">{plan.tagline}</p>
+                <div className="mb-3">
+                  <span className="text-2xl font-bold text-gray-900">{plan.price}</span>
+                  {plan.period && <span className="text-xs text-gray-400">{plan.period}</span>}
+                </div>
+                <p className="text-xs font-medium text-gray-700 mb-3">{plan.credits}</p>
+                <ul className="space-y-1.5 mb-4 flex-1">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-1.5 text-xs text-gray-500">
+                      <Check className="h-3 w-3 text-blue-600 shrink-0 mt-0.5" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                {isCurrent ? (
+                  <Button disabled variant="outline" className="w-full border-gray-200 text-gray-400">
+                    Current plan
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setUpgradePlan(plan.id as "pro" | "business" | "enterprise")}
+                    variant="outline"
+                    className="w-full border-gray-200 text-gray-700 hover:bg-gray-50"
+                  >
+                    {plan.id === "enterprise" ? "Contact sales" : "Join waitlist"}
+                  </Button>
+                )}
+              </SettingsCard>
+            );
+          })}
+        </div>
+      </div>
+
+      <UpgradeDialog
+        open={upgradePlan !== null}
+        onClose={() => setUpgradePlan(null)}
+        plan={upgradePlan ?? "pro"}
+        light
+      />
     </div>
   );
 }
