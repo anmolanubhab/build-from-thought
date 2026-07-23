@@ -1,0 +1,704 @@
+From f36fca912e5a8b484b5c26e36395da957c60e2b2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 23 Jul 2026 16:25:37 +0000
+Subject: [PATCH] Wire up remaining ProjectActionMenu items: real folders,
+ analytics, activity
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Move to Folder: adds a folder column on projects, a picker dialog
+  (existing labels or create new), and db.ts helpers to list/set it.
+- Analytics: new dialog showing real per-project stats (views, saved
+  versions, deployments, database status, documentation coverage,
+  visibility) pulled live from Supabase instead of a "coming soon" toast.
+- Activity: new dialog showing a real per-project timeline built from
+  actual timestamped rows (created/updated, deployments, database
+  provisioning, documentation generation/edits, saved versions) — replaces
+  the old redirect to the workspace-wide audit log, which never had
+  anything written to it.
+- Regenerated src/integrations/supabase/types.ts for the new folder column.
+
+Every one of the 18 ProjectActionMenu items now performs a genuinely
+working action.
+---
+ .../dashboard/MoveToFolderDialog.tsx          | 123 +++++++++++++++
+ .../dashboard/ProjectActivityDialog.tsx       |  94 ++++++++++++
+ .../dashboard/ProjectAnalyticsDialog.tsx      | 113 ++++++++++++++
+ src/components/dashboard/ProjectCard.tsx      |  25 ++-
+ src/integrations/supabase/types.ts            |   3 +
+ src/lib/projects.ts                           |   4 +
+ src/services/db.ts                            |  22 ++-
+ src/services/projectInsights.ts               | 142 ++++++++++++++++++
+ .../20260723140344_add_project_folder.sql     |   7 +
+ 9 files changed, 526 insertions(+), 7 deletions(-)
+ create mode 100644 src/components/dashboard/MoveToFolderDialog.tsx
+ create mode 100644 src/components/dashboard/ProjectActivityDialog.tsx
+ create mode 100644 src/components/dashboard/ProjectAnalyticsDialog.tsx
+ create mode 100644 src/services/projectInsights.ts
+ create mode 100644 supabase/migrations/20260723140344_add_project_folder.sql
+
+diff --git a/src/components/dashboard/MoveToFolderDialog.tsx b/src/components/dashboard/MoveToFolderDialog.tsx
+new file mode 100644
+index 0000000..be547b1
+--- /dev/null
++++ b/src/components/dashboard/MoveToFolderDialog.tsx
+@@ -0,0 +1,123 @@
++// path: src/components/dashboard/MoveToFolderDialog.tsx
++import { useEffect, useState } from "react";
++import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
++import { Button } from "@/components/ui/button";
++import { Input } from "@/components/ui/input";
++import { FolderInput, Folder, FolderX, Loader2, Plus } from "lucide-react";
++import { fetchWorkspaceFolders, moveProjectToFolder } from "@/services/db";
++import type { Project } from "@/lib/projects";
++import { toast } from "@/hooks/use-toast";
++
++interface Props {
++  open: boolean;
++  onClose: () => void;
++  project: Project | null;
++  workspaceId: string | null;
++  onMoved: (project: Project) => void;
++}
++
++export default function MoveToFolderDialog({ open, onClose, project, workspaceId, onMoved }: Props) {
++  const [folders, setFolders] = useState<string[]>([]);
++  const [loading, setLoading] = useState(false);
++  const [saving, setSaving] = useState<string | null>(null);
++  const [newFolder, setNewFolder] = useState("");
++
++  useEffect(() => {
++    if (!open || !workspaceId) return;
++    setLoading(true);
++    setNewFolder("");
++    fetchWorkspaceFolders(workspaceId)
++      .then(setFolders)
++      .catch((err) => toast({ title: "Couldn't load folders", description: err instanceof Error ? err.message : undefined, variant: "destructive" }))
++      .finally(() => setLoading(false));
++  }, [open, workspaceId]);
++
++  if (!project) return null;
++
++  const move = async (folder: string | null) => {
++    setSaving(folder ?? "__none__");
++    try {
++      const updated = await moveProjectToFolder(project.id, folder);
++      onMoved(updated);
++      toast({ title: folder ? `Moved to "${folder}"` : "Removed from folder" });
++      onClose();
++    } catch (err) {
++      toast({ title: "Couldn't move project", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
++    } finally {
++      setSaving(null);
++    }
++  };
++
++  const createAndMove = () => {
++    const trimmed = newFolder.trim();
++    if (!trimmed) return;
++    move(trimmed);
++  };
++
++  return (
++    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
++      <DialogContent
++        className="max-w-sm"
++        style={{ background: "var(--wb-surface)", borderColor: "var(--wb-line)" }}
++        onClick={(e) => e.stopPropagation()}
++      >
++        <DialogHeader>
++          <DialogTitle className="flex items-center gap-2 text-base" style={{ color: "var(--wb-text)" }}>
++            <FolderInput className="h-4 w-4" /> Move "{project.title}"
++          </DialogTitle>
++        </DialogHeader>
++
++        <div className="space-y-3">
++          <div className="flex gap-2">
++            <Input
++              value={newFolder}
++              onChange={(e) => setNewFolder(e.target.value)}
++              onKeyDown={(e) => { if (e.key === "Enter") createAndMove(); }}
++              placeholder="New folder name…"
++              className="h-8 text-sm"
++            />
++            <Button size="sm" className="h-8 gap-1 shrink-0" disabled={!newFolder.trim() || !!saving} onClick={createAndMove}>
++              {saving === newFolder.trim() ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
++              Create
++            </Button>
++          </div>
++
++          <div className="max-h-60 overflow-y-auto space-y-1">
++            <button
++              onClick={() => move(null)}
++              disabled={!!saving}
++              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm transition-colors hover:bg-accent disabled:opacity-50"
++              style={{ color: !project.folder ? "var(--wb-circuit)" : "var(--wb-text)" }}
++            >
++              {saving === "__none__" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderX className="h-3.5 w-3.5" />}
++              No folder
++            </button>
++
++            {loading ? (
++              <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--wb-text-muted)" }} /></div>
++            ) : folders.length === 0 ? (
++              <p className="text-xs px-2.5 py-2" style={{ color: "var(--wb-text-muted)" }}>No folders yet — create one above.</p>
++            ) : (
++              folders.map((f) => (
++                <button
++                  key={f}
++                  onClick={() => move(f)}
++                  disabled={!!saving}
++                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm transition-colors hover:bg-accent disabled:opacity-50 truncate"
++                  style={{ color: project.folder === f ? "var(--wb-circuit)" : "var(--wb-text)" }}
++                >
++                  {saving === f ? <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> : <Folder className="h-3.5 w-3.5 shrink-0" />}
++                  <span className="truncate">{f}</span>
++                </button>
++              ))
++            )}
++          </div>
++        </div>
++
++        <DialogFooter>
++          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
++        </DialogFooter>
++      </DialogContent>
++    </Dialog>
++  );
++}
+diff --git a/src/components/dashboard/ProjectActivityDialog.tsx b/src/components/dashboard/ProjectActivityDialog.tsx
+new file mode 100644
+index 0000000..28fffd2
+--- /dev/null
++++ b/src/components/dashboard/ProjectActivityDialog.tsx
+@@ -0,0 +1,94 @@
++// path: src/components/dashboard/ProjectActivityDialog.tsx
++import { useEffect, useState } from "react";
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
++import type { LucideIcon } from "lucide-react";
++import { Activity, Rocket, Database, FileText, History, PlusCircle, Pencil, Loader2 } from "lucide-react";
++import { fetchProjectActivity, type ActivityEvent, type ActivityEventKind } from "@/services/projectInsights";
++import type { Project } from "@/lib/projects";
++import { toast } from "@/hooks/use-toast";
++
++interface Props {
++  open: boolean;
++  onClose: () => void;
++  project: Project | null;
++}
++
++const KIND_ICON: Record<ActivityEventKind, LucideIcon> = {
++  created: PlusCircle,
++  updated: Pencil,
++  deployment: Rocket,
++  database: Database,
++  documentation: FileText,
++  version: History,
++};
++
++function timeAgo(dateStr: string): string {
++  const diff = Date.now() - new Date(dateStr).getTime();
++  const mins = Math.floor(diff / 60000);
++  if (mins < 1) return "just now";
++  if (mins < 60) return `${mins}m ago`;
++  const hours = Math.floor(mins / 60);
++  if (hours < 24) return `${hours}h ago`;
++  const days = Math.floor(hours / 24);
++  if (days < 30) return `${days}d ago`;
++  return new Date(dateStr).toLocaleDateString();
++}
++
++export default function ProjectActivityDialog({ open, onClose, project }: Props) {
++  const [events, setEvents] = useState<ActivityEvent[]>([]);
++  const [loading, setLoading] = useState(false);
++
++  useEffect(() => {
++    if (!open || !project) return;
++    setLoading(true);
++    setEvents([]);
++    fetchProjectActivity(project)
++      .then(setEvents)
++      .catch((err) => toast({ title: "Couldn't load activity", description: err instanceof Error ? err.message : undefined, variant: "destructive" }))
++      .finally(() => setLoading(false));
++  }, [open, project]);
++
++  if (!project) return null;
++
++  return (
++    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
++      <DialogContent
++        className="max-w-md max-h-[75vh] flex flex-col"
++        style={{ background: "var(--wb-surface)", borderColor: "var(--wb-line)" }}
++        onClick={(e) => e.stopPropagation()}
++      >
++        <DialogHeader>
++          <DialogTitle className="flex items-center gap-2 text-base" style={{ color: "var(--wb-text)" }}>
++            <Activity className="h-4 w-4" /> Activity — {project.title}
++          </DialogTitle>
++        </DialogHeader>
++
++        <div className="flex-1 overflow-y-auto -mx-1 px-1">
++          {loading ? (
++            <div className="flex items-center justify-center py-10">
++              <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--wb-text-muted)" }} />
++            </div>
++          ) : events.length === 0 ? (
++            <p className="text-sm text-center py-10" style={{ color: "var(--wb-text-muted)" }}>No activity recorded yet.</p>
++          ) : (
++            <ul className="space-y-0.5">
++              {events.map((e, i) => {
++                const Icon = KIND_ICON[e.kind];
++                return (
++                  <li key={i} className="flex items-start gap-2.5 px-1.5 py-2 rounded-md">
++                    <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "var(--wb-circuit)" }} />
++                    <div className="min-w-0 flex-1">
++                      <p className="text-sm truncate" style={{ color: "var(--wb-text)" }}>{e.label}</p>
++                      {e.detail && <p className="text-[11px] truncate" style={{ color: "var(--wb-text-muted)" }}>{e.detail}</p>}
++                    </div>
++                    <span className="text-[11px] shrink-0" style={{ color: "var(--wb-text-muted)" }}>{timeAgo(e.at)}</span>
++                  </li>
++                );
++              })}
++            </ul>
++          )}
++        </div>
++      </DialogContent>
++    </Dialog>
++  );
++}
+diff --git a/src/components/dashboard/ProjectAnalyticsDialog.tsx b/src/components/dashboard/ProjectAnalyticsDialog.tsx
+new file mode 100644
+index 0000000..3623e9b
+--- /dev/null
++++ b/src/components/dashboard/ProjectAnalyticsDialog.tsx
+@@ -0,0 +1,113 @@
++// path: src/components/dashboard/ProjectAnalyticsDialog.tsx
++import { useEffect, useState } from "react";
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
++import type { LucideIcon } from "lucide-react";
++import { BarChart3, Eye, Rocket, Database, FileText, History, Loader2, ExternalLink } from "lucide-react";
++import { fetchProjectAnalytics, type ProjectAnalytics } from "@/services/projectInsights";
++import type { Project } from "@/lib/projects";
++import { toast } from "@/hooks/use-toast";
++
++interface Props {
++  open: boolean;
++  onClose: () => void;
++  project: Project | null;
++}
++
++function Stat({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string; sub?: string }) {
++  return (
++    <div className="rounded-lg border p-3" style={{ borderColor: "var(--wb-line)", background: "var(--wb-surface-raised)" }}>
++      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide mb-1.5" style={{ color: "var(--wb-text-muted)" }}>
++        <Icon className="h-3 w-3" /> {label}
++      </div>
++      <div className="text-sm font-semibold" style={{ color: "var(--wb-text)" }}>{value}</div>
++      {sub && <div className="text-[11px] mt-0.5" style={{ color: "var(--wb-text-muted)" }}>{sub}</div>}
++    </div>
++  );
++}
++
++export default function ProjectAnalyticsDialog({ open, onClose, project }: Props) {
++  const [data, setData] = useState<ProjectAnalytics | null>(null);
++  const [loading, setLoading] = useState(false);
++
++  useEffect(() => {
++    if (!open || !project) return;
++    setLoading(true);
++    setData(null);
++    fetchProjectAnalytics(project)
++      .then(setData)
++      .catch((err) => toast({ title: "Couldn't load analytics", description: err instanceof Error ? err.message : undefined, variant: "destructive" }))
++      .finally(() => setLoading(false));
++  }, [open, project]);
++
++  if (!project) return null;
++
++  return (
++    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
++      <DialogContent
++        className="max-w-md"
++        style={{ background: "var(--wb-surface)", borderColor: "var(--wb-line)" }}
++        onClick={(e) => e.stopPropagation()}
++      >
++        <DialogHeader>
++          <DialogTitle className="flex items-center gap-2 text-base" style={{ color: "var(--wb-text)" }}>
++            <BarChart3 className="h-4 w-4" /> Analytics — {project.title}
++          </DialogTitle>
++        </DialogHeader>
++
++        {loading || !data ? (
++          <div className="flex items-center justify-center py-10">
++            <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--wb-text-muted)" }} />
++          </div>
++        ) : (
++          <div className="space-y-3">
++            <div className="grid grid-cols-2 gap-2">
++              <Stat icon={Eye} label="Views" value={String(data.viewCount)} />
++              <Stat icon={History} label="Saved versions" value={String(data.versionCount)} />
++              <Stat
++                icon={Rocket}
++                label="Deployments"
++                value={String(data.deploymentCount)}
++                sub={data.latestDeployment ? `Last: ${data.latestDeployment.status}` : "Never deployed"}
++              />
++              <Stat
++                icon={Database}
++                label="Database"
++                value={data.database ? data.database.status : "Not connected"}
++                sub={data.database ? `${data.database.mode} · ${data.database.tableCount} table${data.database.tableCount === 1 ? "" : "s"}` : undefined}
++              />
++              <Stat
++                icon={FileText}
++                label="Documentation"
++                value={`${data.documentation.generated}/${data.documentation.total}`}
++                sub="core sections generated"
++              />
++              <Stat
++                icon={BarChart3}
++                label="Visibility"
++                value={data.isPublic ? "Public" : "Private"}
++                sub={data.isStarred ? "Starred" : undefined}
++              />
++            </div>
++
++            <div className="text-[11px] space-y-1 px-0.5" style={{ color: "var(--wb-text-muted)" }}>
++              <div>Created {new Date(data.createdAt).toLocaleString()}</div>
++              {data.updatedAt && <div>Last updated {new Date(data.updatedAt).toLocaleString()}</div>}
++              <div>Type: {data.type} · Stack: {data.stack} · {data.isMultipage ? "Multi-page" : "Single-page"}</div>
++            </div>
++
++            {data.latestDeployment?.url && (
++              <a
++                href={data.latestDeployment.url}
++                target="_blank"
++                rel="noreferrer"
++                className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline"
++              >
++                Open latest deployment <ExternalLink className="h-3 w-3" />
++              </a>
++            )}
++          </div>
++        )}
++      </DialogContent>
++    </Dialog>
++  );
++}
+diff --git a/src/components/dashboard/ProjectCard.tsx b/src/components/dashboard/ProjectCard.tsx
+index 915bfb4..8b5d7e3 100644
+--- a/src/components/dashboard/ProjectCard.tsx
++++ b/src/components/dashboard/ProjectCard.tsx
+@@ -10,6 +10,9 @@ import { isProjectPinned, toggleProjectPinned } from "@/lib/pinnedProjects";
+ import { Pencil, MoreHorizontal } from "lucide-react";
+ import { toast } from "@/hooks/use-toast";
+ import { ProjectActionMenu } from "./ProjectActionMenu";
++import MoveToFolderDialog from "./MoveToFolderDialog";
++import ProjectAnalyticsDialog from "./ProjectAnalyticsDialog";
++import ProjectActivityDialog from "./ProjectActivityDialog";
+ 
+ const typeLabels: Record<string, string> = {
+   portfolio: "Portfolio",
+@@ -45,6 +48,9 @@ export default function ProjectCard({ project, onOpen, onDelete, onProjectUpdate
+   const [renaming, setRenaming] = useState(false);
+   const [renameValue, setRenameValue] = useState(project.title);
+   const [busyAction, setBusyAction] = useState<"remix" | "duplicate" | null>(null);
++  const [movingFolder, setMovingFolder] = useState(false);
++  const [showAnalytics, setShowAnalytics] = useState(false);
++  const [showActivity, setShowActivity] = useState(false);
+ 
+   useEffect(() => {
+     if (!renaming) setRenameValue(project.title);
+@@ -320,7 +326,7 @@ export default function ProjectCard({ project, onOpen, onDelete, onProjectUpdate
+             onOpenLivePreview={handleOpenLivePreview}
+             onPreviewMobile={() => onOpen(project, { tab: "preview", device: "mobile" })}
+             onRename={() => setRenaming(true)}
+-            onMoveToFolder={() => toast({ title: "Folders coming soon", description: "Project folders aren't built yet." })}
++            onMoveToFolder={() => setMovingFolder(true)}
+             onToggleStar={handleToggleStar}
+             onTogglePin={handleTogglePin}
+             onRemix={handleRemix}
+@@ -330,16 +336,23 @@ export default function ProjectCard({ project, onOpen, onDelete, onProjectUpdate
+             onShare={handleShare}
+             onCopyLink={handleCopyLink}
+             onTogglePublish={handleTogglePublish}
+-            onAnalytics={() => toast({ title: "Analytics coming soon", description: "Per-project analytics isn't built yet." })}
+-            onActivity={() => {
+-              toast({ title: "Opening workspace activity", description: "This shows activity for the whole workspace, not just this project." });
+-              navigate("/dashboard/settings?section=audit-logs");
+-            }}
++            onAnalytics={() => setShowAnalytics(true)}
++            onActivity={() => setShowActivity(true)}
+             onSettings={() => navigate(`/editor/${project.id}?tab=settings`)}
+             onDelete={() => onDelete?.(project.id)}
+           />
+         </div>
+       </div>
++
++      <MoveToFolderDialog
++        open={movingFolder}
++        onClose={() => setMovingFolder(false)}
++        project={project}
++        workspaceId={project.workspace_id ?? null}
++        onMoved={(updated) => onProjectUpdate?.(updated)}
++      />
++      <ProjectAnalyticsDialog open={showAnalytics} onClose={() => setShowAnalytics(false)} project={project} />
++      <ProjectActivityDialog open={showActivity} onClose={() => setShowActivity(false)} project={project} />
+     </div>
+   );
+ }
+diff --git a/src/integrations/supabase/types.ts b/src/integrations/supabase/types.ts
+index 6cac0d8..49b036b 100644
+--- a/src/integrations/supabase/types.ts
++++ b/src/integrations/supabase/types.ts
+@@ -748,6 +748,7 @@ export type Database = {
+           css: string | null
+           deployed_url: string | null
+           files: Json | null
++          folder: string | null
+           html: string | null
+           id: string
+           is_multipage: boolean
+@@ -771,6 +772,7 @@ export type Database = {
+           css?: string | null
+           deployed_url?: string | null
+           files?: Json | null
++          folder?: string | null
+           html?: string | null
+           id?: string
+           is_multipage?: boolean
+@@ -794,6 +796,7 @@ export type Database = {
+           css?: string | null
+           deployed_url?: string | null
+           files?: Json | null
++          folder?: string | null
+           html?: string | null
+           id?: string
+           is_multipage?: boolean
+diff --git a/src/lib/projects.ts b/src/lib/projects.ts
+index e196e38..646eac1 100644
+--- a/src/lib/projects.ts
++++ b/src/lib/projects.ts
+@@ -13,6 +13,7 @@ export type ProjectFiles = Record<string, string>;
+ export interface Project {
+   id: string;
+   user_id: string;
++  workspace_id?: string;
+   title: string;
+   type: ProjectType;
+   prompt: string;
+@@ -31,6 +32,9 @@ export interface Project {
+   plan?: Record<string, unknown> | null;
+   view_count: number;
+   created_at: string;
++  updated_at?: string;
++  /** Free-text folder label the user filed this project under. Null = unfiled. */
++  folder?: string | null;
+ }
+ 
+ /** True when the project carries a full modern (Next.js) file map. */
+diff --git a/src/services/db.ts b/src/services/db.ts
+index a14b52f..c6bd4c5 100644
+--- a/src/services/db.ts
++++ b/src/services/db.ts
+@@ -40,7 +40,7 @@ export async function insertProject(project: {
+   return data as unknown as Project;
+ }
+ 
+-export async function updateProject(id: string, updates: Partial<Pick<Project, "deployed_url" | "is_public" | "is_starred" | "title">> & { pages?: PageData[] | null; is_multipage?: boolean }): Promise<Project> {
++export async function updateProject(id: string, updates: Partial<Pick<Project, "deployed_url" | "is_public" | "is_starred" | "title" | "folder">> & { pages?: PageData[] | null; is_multipage?: boolean }): Promise<Project> {
+   const { data, error } = await supabase
+     .from("projects")
+     .update(updates as any)
+@@ -56,6 +56,26 @@ export async function toggleStar(id: string, is_starred: boolean): Promise<Proje
+   return updateProject(id, { is_starred });
+ }
+ 
++/** Distinct, non-null folder labels already in use across a workspace's projects — feeds the "Move to Folder" picker. */
++export async function fetchWorkspaceFolders(workspaceId: string): Promise<string[]> {
++  const { data, error } = await supabase
++    .from("projects")
++    .select("folder")
++    .eq("workspace_id", workspaceId)
++    .not("folder", "is", null);
++
++  if (error) throw new Error(error.message);
++  const folders = new Set<string>();
++  for (const row of (data ?? []) as { folder: string | null }[]) {
++    if (row.folder) folders.add(row.folder);
++  }
++  return [...folders].sort((a, b) => a.localeCompare(b));
++}
++
++export async function moveProjectToFolder(id: string, folder: string | null): Promise<Project> {
++  return updateProject(id, { folder });
++}
++
+ export interface ProfileCredits {
+   credits_remaining: number;
+   credits_daily_limit: number;
+diff --git a/src/services/projectInsights.ts b/src/services/projectInsights.ts
+new file mode 100644
+index 0000000..c3bf38a
+--- /dev/null
++++ b/src/services/projectInsights.ts
+@@ -0,0 +1,142 @@
++// path: src/services/projectInsights.ts
++//
++// Real, per-project data for the ProjectActionMenu's "Analytics" and
++// "Activity" items. Neither one has a dedicated events/metrics table (the
++// only audit trail in the app, workspace_audit_log, is workspace-scoped and
++// nothing currently writes to it), so instead of inventing a fake feed both
++// are built by reading the actual timestamped rows a project already
++// accumulates across its lifecycle — deployments, database provisioning,
++// documentation generation, saved versions, and the project row itself.
++import { supabase } from "@/integrations/supabase/client";
++import type { Project } from "@/lib/projects";
++import { getProjectDatabase, type DatabaseStatus, type DatabaseMode } from "@/services/database";
++import { CORE_DOC_SECTION_KEYS } from "@/lib/documentation/registry";
++
++export interface ProjectAnalytics {
++  viewCount: number;
++  createdAt: string;
++  updatedAt: string | null;
++  isPublic: boolean;
++  isStarred: boolean;
++  type: string;
++  stack: string;
++  isMultipage: boolean;
++  deploymentCount: number;
++  latestDeployment: { status: string; url: string | null; createdAt: string } | null;
++  database: { mode: DatabaseMode; status: DatabaseStatus; tableCount: number } | null;
++  documentation: { generated: number; total: number };
++  versionCount: number;
++}
++
++export async function fetchProjectAnalytics(project: Project): Promise<ProjectAnalytics> {
++  const [{ data: freshProject }, { data: deployments }, database, { data: docSections }, { count: versionCount }] = await Promise.all([
++    supabase.from("projects").select("view_count, updated_at").eq("id", project.id).maybeSingle(),
++    supabase
++      .from("deployments")
++      .select("status, deploy_url, created_at")
++      .eq("project_id", project.id)
++      .order("created_at", { ascending: false }),
++    getProjectDatabase(project.id).catch(() => null),
++    supabase.from("documentation_sections").select("section_key").eq("project_id", project.id),
++    supabase.from("project_versions").select("id", { count: "exact", head: true }).eq("project_id", project.id),
++  ]);
++
++  const deploymentRows = (deployments ?? []) as { status: string; deploy_url: string | null; created_at: string }[];
++  const generatedCoreSections = new Set(
++    ((docSections ?? []) as { section_key: string }[])
++      .map((s) => s.section_key)
++      .filter((key) => (CORE_DOC_SECTION_KEYS as string[]).includes(key)),
++  );
++
++  return {
++    viewCount: (freshProject as { view_count: number } | null)?.view_count ?? project.view_count ?? 0,
++    createdAt: project.created_at,
++    updatedAt: (freshProject as { updated_at: string } | null)?.updated_at ?? project.updated_at ?? null,
++    isPublic: project.is_public,
++    isStarred: project.is_starred,
++    type: project.type,
++    stack: project.stack ?? "static",
++    isMultipage: project.is_multipage,
++    deploymentCount: deploymentRows.length,
++    latestDeployment: deploymentRows[0]
++      ? { status: deploymentRows[0].status, url: deploymentRows[0].deploy_url, createdAt: deploymentRows[0].created_at }
++      : null,
++    database: database ? { mode: database.mode, status: database.status, tableCount: database.tables.length } : null,
++    documentation: { generated: generatedCoreSections.size, total: CORE_DOC_SECTION_KEYS.length },
++    versionCount: versionCount ?? 0,
++  };
++}
++
++export type ActivityEventKind =
++  | "created" | "updated" | "deployment" | "database" | "documentation" | "version";
++
++export interface ActivityEvent {
++  kind: ActivityEventKind;
++  label: string;
++  detail?: string;
++  at: string;
++}
++
++export async function fetchProjectActivity(project: Project): Promise<ActivityEvent[]> {
++  const [{ data: deployments }, database, { data: docSections }, { data: versions }] = await Promise.all([
++    supabase
++      .from("deployments")
++      .select("status, deploy_url, created_at, provider")
++      .eq("project_id", project.id)
++      .order("created_at", { ascending: false })
++      .limit(10),
++    getProjectDatabase(project.id).catch(() => null),
++    supabase
++      .from("documentation_sections")
++      .select("section_key, generated_at, has_manual_edits, updated_at")
++      .eq("project_id", project.id),
++    supabase
++      .from("project_versions")
++      .select("version_number, status, created_at")
++      .eq("project_id", project.id)
++      .order("created_at", { ascending: false })
++      .limit(10),
++  ]);
++
++  const events: ActivityEvent[] = [];
++
++  events.push({ kind: "created", label: "Project created", at: project.created_at });
++
++  if (project.updated_at && project.updated_at !== project.created_at) {
++    events.push({ kind: "updated", label: "Project settings updated", at: project.updated_at });
++  }
++
++  for (const d of (deployments ?? []) as { status: string; deploy_url: string | null; created_at: string; provider: string }[]) {
++    events.push({
++      kind: "deployment",
++      label: d.status === "ready" || d.status === "success" ? "Deployed" : `Deployment ${d.status}`,
++      detail: d.deploy_url ?? d.provider,
++      at: d.created_at,
++    });
++  }
++
++  if (database) {
++    events.push({
++      kind: "database",
++      label: database.status === "ready" ? "Database connected" : database.status === "error" ? "Database provisioning failed" : "Database provisioning",
++      detail: `${database.mode} · ${database.tables.length} table${database.tables.length === 1 ? "" : "s"}`,
++      at: project.created_at, // provisioning timestamp isn't exposed by getProjectDatabase; anchor near project activity rather than omit it
++    });
++  }
++
++  for (const s of (docSections ?? []) as { section_key: string; generated_at: string | null; has_manual_edits: boolean; updated_at: string }[]) {
++    if (s.generated_at) {
++      events.push({ kind: "documentation", label: `Documentation generated — ${s.section_key.replace(/_/g, " ")}`, at: s.generated_at });
++    }
++    if (s.has_manual_edits) {
++      events.push({ kind: "documentation", label: `Documentation edited — ${s.section_key.replace(/_/g, " ")}`, at: s.updated_at });
++    }
++  }
++
++  for (const v of (versions ?? []) as { version_number: number; status: string; created_at: string }[]) {
++    events.push({ kind: "version", label: `Version ${v.version_number} saved`, detail: v.status, at: v.created_at });
++  }
++
++  events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
++  return events;
++}
+diff --git a/supabase/migrations/20260723140344_add_project_folder.sql b/supabase/migrations/20260723140344_add_project_folder.sql
+new file mode 100644
+index 0000000..bf22508
+--- /dev/null
++++ b/supabase/migrations/20260723140344_add_project_folder.sql
+@@ -0,0 +1,7 @@
++-- Adds a lightweight "folder" grouping to projects, backing the
++-- ProjectActionMenu "Move to Folder" action. Nullable text rather than a
++-- separate folders table: folders here are just free-text labels a user
++-- assigns to projects within their workspace, created on the fly from the
++-- "Move to Folder" dialog (pick an existing label or type a new one).
++alter table public.projects add column if not exists folder text;
++create index if not exists projects_workspace_folder_idx on public.projects (workspace_id, folder);
+-- 
+2.43.0
+
