@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         redeemPendingReferral();
         redeemPendingWorkspaceInvite();
+        redeemPendingInvitation();
       }
     });
 
@@ -47,6 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         redeemPendingReferral();
         redeemPendingWorkspaceInvite();
+        redeemPendingInvitation();
       }
     });
 
@@ -73,6 +75,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       // Best-effort: an invalid/duplicate invite code isn't user-facing here —
       // JoinWorkspace.tsx handles the direct-link (already-logged-in) case explicitly.
+    }
+  };
+
+  const redeemPendingInvitation = async () => {
+    const invitationId = localStorage.getItem("pending_workspace_invitation_id");
+    if (!invitationId) return;
+    localStorage.removeItem("pending_workspace_invitation_id");
+    try {
+      await supabase.rpc("accept_workspace_invitation", { p_invitation_id: invitationId });
+    } catch {
+      // Best-effort: an already-accepted/revoked invitation isn't user-facing here —
+      // AcceptInvite.tsx handles the direct-link (already-logged-in) case explicitly.
     }
   };
 

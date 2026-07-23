@@ -16,6 +16,7 @@ import DashboardSettings from "./pages/DashboardSettings.tsx";
 import Resources from "./pages/Resources.tsx";
 import SharePage from "./pages/SharePage.tsx";
 import JoinWorkspace from "./pages/JoinWorkspace.tsx";
+import AcceptInvite from "./pages/AcceptInvite.tsx";
 import Editor from "./pages/Editor.tsx";
 import About from "./pages/About.tsx";
 import Contact from "./pages/Contact.tsx";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/dashboard/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
             <Route path="/share/:slug" element={<SharePage />} />
             <Route path="/join/:code" element={<JoinWorkspace />} />
+            <Route path="/join/invite/:id" element={<AcceptInvite />} />
             <Route path="/editor/:id" element={<ProtectedRoute><Editor /></ProtectedRoute>} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />

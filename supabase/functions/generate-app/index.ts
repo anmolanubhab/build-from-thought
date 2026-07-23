@@ -498,6 +498,11 @@ serve(async (req) => {
       .eq("id", user.id);
     if (updateError) console.error("Failed to update credits:", updateError.message);
 
+    const { error: usageError } = await supabase
+      .from("credit_usage_events")
+      .insert({ user_id: user.id, amount: 1 });
+    if (usageError) console.error("Failed to log credit usage:", usageError.message);
+
     const { key: templateKey, template } = detectTemplate(prompt);
 
     // =====================================================================

@@ -1,6 +1,6 @@
 // path: src/services/workspaces.ts
 import { supabase } from "@/integrations/supabase/client";
-import type { Workspace, WorkspaceMember } from "@/lib/workspaces";
+import type { Workspace, WorkspaceMember, WorkspaceRosterEntry } from "@/lib/workspaces";
 import { CURRENT_WORKSPACE_STORAGE_KEY } from "@/lib/workspaces";
 
 export async function fetchUserWorkspaces(): Promise<Workspace[]> {
@@ -46,6 +46,25 @@ export async function fetchWorkspaceMembers(workspaceId: string): Promise<Worksp
 
   const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
   return rows.map((m) => ({ ...m, profile: profileMap.get(m.user_id) ?? null }));
+}
+
+/** Active members + pending invitations, with emails and real usage numbers, in one call. */
+export async function fetchWorkspaceRoster(workspaceId: string): Promise<WorkspaceRosterEntry[]> {
+  const { data, error } = await supabase.rpc("get_workspace_roster", { p_workspace_id: workspaceId });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as WorkspaceRosterEntry[];
+}
+
+/** RLS/RPC restricts this to the workspace owner; throws if the email is already a member. */
+export async function inviteWorkspaceMember(workspaceId: string, email: string): Promise<void> {
+  const { error } = await supabase.rpc("invite_workspace_member", { p_workspace_id: workspaceId, p_email: email });
+  if (error) throw new Error(error.message);
+}
+
+/** RLS/RPC restricts this to the workspace owner. */
+export async function revokeWorkspaceInvitation(invitationId: string): Promise<void> {
+  const { error } = await supabase.rpc("revoke_workspace_invitation", { p_invitation_id: invitationId });
+  if (error) throw new Error(error.message);
 }
 
 /** Removes a member row. RLS allows this for either a self-leave or an owner removing a non-owner. */

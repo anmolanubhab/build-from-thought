@@ -83,6 +83,27 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_usage_events: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       deployments: {
         Row: {
           ai_suggestions: Json | null
@@ -1128,6 +1149,47 @@ export type Database = {
           },
         ]
       }
+      workspace_invitations: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          responded_at: string | null
+          role: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_by: string
+          responded_at?: string | null
+          role?: string
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string
+          responded_at?: string | null
+          role?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_knowledge: {
         Row: {
           content: string
@@ -1362,6 +1424,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_workspace_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: {
+          avatar_url: string | null
+          created_at: string
+          default_member_credit_limit: number | null
+          handle: string | null
+          id: string
+          invite_code: string
+          name: string
+          owner_id: string
+          plan: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspaces"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_workspace: {
         Args: { p_name: string }
         Returns: {
@@ -1407,6 +1490,43 @@ export type Database = {
           vercel_username: string
         }[]
       }
+      get_workspace_roster: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          avatar_url: string | null
+          credit_limit: number | null
+          display_name: string | null
+          email: string | null
+          id: string
+          joined_at: string
+          kind: string
+          role: string
+          status: string
+          usage_month: number
+          usage_total: number
+          user_id: string | null
+          username: string | null
+        }[]
+      }
+      invite_workspace_member: {
+        Args: { p_email: string; p_workspace_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          responded_at: string | null
+          role: string
+          status: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       is_workspace_member: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -1442,6 +1562,10 @@ export type Database = {
         Returns: undefined
       }
       record_referral: { Args: { p_referrer_id: string }; Returns: undefined }
+      revoke_workspace_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

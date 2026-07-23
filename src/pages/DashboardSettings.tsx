@@ -191,7 +191,7 @@ const DashboardSettings = () => {
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-6 py-10">
+        <div className={`mx-auto px-6 py-10 ${section === "people" ? "max-w-5xl" : "max-w-2xl"}`}>
           <Link to="/dashboard" className="md:hidden inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6">
             <ArrowLeft className="h-3.5 w-3.5" /> Go back
           </Link>

@@ -28,6 +28,10 @@ const Signup = () => {
     if (workspaceCode) {
       localStorage.setItem("pending_workspace_invite", workspaceCode);
     }
+    const invitationId = params.get("invite");
+    if (invitationId) {
+      localStorage.setItem("pending_workspace_invitation_id", invitationId);
+    }
   }, []);
 
   if (!isLoading && user) return <Navigate to="/dashboard" replace />;
