@@ -81,3 +81,33 @@ export interface GenerateDocumentationResult {
     deployment_count: number;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Generate All: batch orchestration (see src/services/documentationBatch.ts).
+// One row per project in documentation_generation_jobs — a live status board
+// the client re-reads on every Documentation Center mount, so "resume" after
+// a closed tab / refresh is just re-reading this row.
+// ---------------------------------------------------------------------------
+
+export type JobStatus = "running" | "completed";
+export type SectionJobStatus = "pending" | "running" | "completed" | "failed";
+
+export interface SectionJobEntry {
+  status: SectionJobStatus;
+  attempts: number;
+  error?: string;
+  completed_at?: string;
+}
+
+export type SectionStatusMap = Partial<Record<DocSectionKey, SectionJobEntry>>;
+
+export interface DocumentationGenerationJob {
+  project_id: string;
+  status: JobStatus;
+  section_keys: DocSectionKey[];
+  section_status: SectionStatusMap;
+  fingerprint: string | null;
+  created_by: string | null;
+  started_at: string;
+  updated_at: string;
+}

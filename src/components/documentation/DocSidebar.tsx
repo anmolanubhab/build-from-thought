@@ -14,19 +14,29 @@ interface Props {
   filledKeys: Set<DocSectionKey>;
   onSearch: () => void;
   onShortcuts: () => void;
+  onGenerateAll: () => void;
   theme: WorkbenchTheme;
   onToggleTheme: () => void;
 }
 
 const GROUP_ORDER: Array<"core" | "ai-tools"> = ["core", "ai-tools"];
 
-export default function DocSidebar({ active, onSelect, outdatedKeys, filledKeys, onSearch, onShortcuts, theme, onToggleTheme }: Props) {
+export default function DocSidebar({ active, onSelect, outdatedKeys, filledKeys, onSearch, onShortcuts, onGenerateAll, theme, onToggleTheme }: Props) {
   return (
     <div className="h-full flex flex-col wb-sans" style={{ background: "var(--wb-surface)" }}>
       <div className="px-3 pt-3 pb-2 flex items-center gap-2 shrink-0">
         <Sparkles className="h-4 w-4" style={{ color: "var(--wb-circuit)" }} />
         <span className="text-sm font-semibold wb-display" style={{ color: "var(--wb-text)" }}>Documentation</span>
       </div>
+
+      <button
+        onClick={onGenerateAll}
+        className="mx-3 mb-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs shrink-0 font-semibold text-white transition-colors"
+        style={{ background: "var(--wb-circuit)" }}
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        <span className="flex-1 text-left">Generate All</span>
+      </button>
 
       <button
         onClick={onSearch}

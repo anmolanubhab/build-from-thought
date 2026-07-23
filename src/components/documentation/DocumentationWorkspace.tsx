@@ -15,6 +15,7 @@ import ExportsPanel from "./ExportsPanel";
 import DocVersionHistoryDialog from "./DocVersionHistoryDialog";
 import DocSearchCommand from "./DocSearchCommand";
 import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
+import GenerateAllDialog from "./GenerateAllDialog";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
@@ -35,6 +36,7 @@ export default function DocumentationWorkspace({ project, onSyncFileToProject }:
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [regeneratingAll, setRegeneratingAll] = useState(false);
+  const [generateAllOpen, setGenerateAllOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +151,7 @@ export default function DocumentationWorkspace({ project, onSyncFileToProject }:
             filledKeys={filledKeys}
             onSearch={() => setSearchOpen(true)}
             onShortcuts={() => setShortcutsOpen(true)}
+            onGenerateAll={() => setGenerateAllOpen(true)}
             theme={theme}
             onToggleTheme={toggleTheme}
           />
@@ -206,6 +209,14 @@ export default function DocumentationWorkspace({ project, onSyncFileToProject }:
       />
       <DocSearchCommand open={searchOpen} onOpenChange={setSearchOpen} sections={sections} onSelect={handleSelect} />
       <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <GenerateAllDialog
+        open={generateAllOpen}
+        onClose={() => setGenerateAllOpen(false)}
+        projectId={project.id}
+        fingerprint={fingerprint}
+        sectionsByKey={sectionsByKey}
+        onSectionChange={handleSectionChange}
+      />
     </div>
   );
 }

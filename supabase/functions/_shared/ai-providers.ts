@@ -10,6 +10,13 @@ const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const ANTHROPIC_MODEL = "claude-opus-4-8";
 
+// Bounds a single Gemini call so a hung upstream request can never quietly
+// exhaust the caller's own Edge Function execution budget — a timeout
+// surfaces as a clean, retryable error instead of a platform-level hang.
+// Callers (e.g. generate-documentation) retry the whole section on this,
+// same as any other transient failure.
+const GEMINI_TIMEOUT_MS = 25_000;
+
 export class ProviderError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -19,15 +26,28 @@ export class ProviderError extends Error {
 }
 
 async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new ProviderError(`Gemini API timed out after ${GEMINI_TIMEOUT_MS}ms`, 504);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     const text = await response.text();
     console.error("Gemini API error:", response.status, text);

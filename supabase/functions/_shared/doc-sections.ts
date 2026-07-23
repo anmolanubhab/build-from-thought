@@ -9,6 +9,19 @@
 // sidebar), never touching generate-documentation/index.ts itself.
 //
 // Keep DOC_SECTION_KEYS in sync with src/lib/documentation/types.ts.
+//
+// Two-stage design (added in the Documentation Center v2 redesign):
+//   1. deriveAnalysis(facts) — the expensive "scan" (file tree, routes, API
+//      routes, env vars, auth files, components, package.json, README).
+//      generate-documentation/index.ts calls this AT MOST ONCE per project
+//      fingerprint and caches the result in project_analysis_cache, so
+//      repeated section requests (including every step of a "Generate All"
+//      run) never re-touch `projects.files` once the cache is warm.
+//   2. buildFactsBlockForSection(analysis, key) — composes a prompt-ready
+//      facts block from ONLY the facets a given section actually needs
+//      (SECTION_FACETS below), instead of always dumping every facet into
+//      every prompt. This is what keeps individual section prompts small
+//      regardless of how large the cached analysis object is.
 
 export type DocSectionKey =
   | "overview"
@@ -31,6 +44,12 @@ export const DOC_SECTION_KEYS: DocSectionKey[] = [
   "api_docs", "database_docs", "architecture", "testing", "deployment_guide",
   "readme", "release_notes", "ai_explain", "viva_mode",
 ];
+
+/** The 12 sections a "Generate All" run targets — excludes ai_explain/viva_mode,
+ *  which need a picked audience/level and stay as their own explicit actions. */
+export const CORE_DOC_SECTION_KEYS: DocSectionKey[] = DOC_SECTION_KEYS.filter(
+  (k) => k !== "ai_explain" && k !== "viva_mode",
+);
 
 export interface DatabaseFacts {
   provider: string;
@@ -75,9 +94,34 @@ export interface SectionRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Project facts block — shared by every section so the model never invents
-// what it can instead read straight from the real project.
+// Stage 1: derive the analysis (the expensive scan). Cached by the caller.
 // ---------------------------------------------------------------------------
+
+/** Everything a doc-section prompt could possibly need, pre-computed once
+ *  per project fingerprint. See project_analysis_cache.analysis in
+ *  supabase/migrations/20260723081628_documentation_generation_v2.sql. */
+export interface ProjectAnalysis {
+  title: string;
+  prompt: string;
+  stack?: string | null;
+  type?: string | null;
+  is_multipage?: boolean;
+  framework: string;
+  fileTree: string;
+  routes: string;
+  apiRoutes: string;
+  envVars: string;
+  authFiles: string;
+  components: string;
+  packageJsonSummary: string;
+  readmeExcerpt: string;
+  database: DatabaseFacts | null;
+  deployments: DeploymentFacts[];
+  domains: string[];
+  githubConnected: boolean;
+  plan: Record<string, unknown> | null;
+  fileCount: number;
+}
 
 function detectFramework(files: Record<string, string> | null): string {
   if (!files || Object.keys(files).length === 0) return "Static HTML/CSS (legacy single/multi-page project)";
@@ -149,47 +193,151 @@ function extractComponents(files: Record<string, string> | null): string {
   return comps.length ? comps.map((p) => `- ${p}`).join("\n") : "(no components/ directory found)";
 }
 
-function buildFactsBlock(facts: ProjectFacts): string {
-  const framework = detectFramework(facts.files);
-  const db = facts.database
-    ? `Provider: ${facts.database.provider} · Mode: ${facts.database.mode}${facts.database.table_prefix ? ` · Table prefix: ${facts.database.table_prefix}` : ""}\nTables: ${facts.database.tables.length ? facts.database.tables.join(", ") : "(provisioned, no tables yet)"}`
-    : "No database connected to this project.";
-  const deploy = facts.deployments.length
-    ? facts.deployments.map((d) => `- ${d.provider}: ${d.status}${d.deploy_url ? ` — ${d.deploy_url}` : ""}`).join("\n")
-    : "Not deployed yet.";
+/** Overview/Developer Guide/README all want a short digest of package.json
+ *  (name, scripts, dependency names) rather than the raw file. */
+function extractPackageJsonSummary(files: Record<string, string> | null): string {
+  const raw = files?.["package.json"];
+  if (!raw) return "(no package.json found in the file map)";
+  try {
+    const pkg = JSON.parse(raw) as { name?: string; version?: string; scripts?: Record<string, string>; dependencies?: Record<string, string> };
+    const lines: string[] = [];
+    if (pkg.name) lines.push(`Name: ${pkg.name}${pkg.version ? ` @ ${pkg.version}` : ""}`);
+    if (pkg.scripts && Object.keys(pkg.scripts).length) {
+      lines.push(`Scripts: ${Object.entries(pkg.scripts).map(([k, v]) => `${k} (\`${v}\`)`).join(", ")}`);
+    }
+    if (pkg.dependencies && Object.keys(pkg.dependencies).length) {
+      lines.push(`Dependencies: ${Object.keys(pkg.dependencies).sort().join(", ")}`);
+    }
+    return lines.length ? lines.join("\n") : "(package.json found but has no name/scripts/dependencies)";
+  } catch {
+    return "(package.json found but could not be parsed as JSON)";
+  }
+}
+
+/** README/Overview want a short excerpt of any existing README so generated
+ *  docs can stay consistent with it rather than contradicting it. */
+function extractReadmeExcerpt(files: Record<string, string> | null): string {
+  const raw = files?.["README.md"];
+  if (!raw) return "(no README.md found in the file map)";
+  const trimmed = raw.trim();
+  return trimmed.length > 1500 ? `${trimmed.slice(0, 1500)}\n… (truncated)` : trimmed;
+}
+
+/** The expensive scan — call at most once per project fingerprint. */
+export function deriveAnalysis(facts: ProjectFacts): ProjectAnalysis {
+  return {
+    title: facts.title,
+    prompt: facts.prompt,
+    stack: facts.stack,
+    type: facts.type,
+    is_multipage: facts.is_multipage,
+    framework: detectFramework(facts.files),
+    fileTree: summarizeFiles(facts.files),
+    routes: extractRoutes(facts.files),
+    apiRoutes: extractApiRoutes(facts.files),
+    envVars: extractEnvVars(facts.files),
+    authFiles: extractAuth(facts.files),
+    components: extractComponents(facts.files),
+    packageJsonSummary: extractPackageJsonSummary(facts.files),
+    readmeExcerpt: extractReadmeExcerpt(facts.files),
+    database: facts.database,
+    deployments: facts.deployments,
+    domains: facts.domains,
+    githubConnected: facts.githubConnected,
+    plan: facts.plan,
+    fileCount: facts.files ? Object.keys(facts.files).length : 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Stage 2: context-aware facet selection. Each section only pulls in the
+// facets it actually needs instead of the full analysis every time.
+// ---------------------------------------------------------------------------
+
+type Facet =
+  | "framework" | "fileTree" | "routes" | "apiRoutes" | "envVars" | "authFiles"
+  | "components" | "packageJson" | "readme" | "database" | "deployments" | "domains" | "github" | "plan";
+
+const ALL_FACETS: Facet[] = [
+  "framework", "fileTree", "routes", "apiRoutes", "envVars", "authFiles",
+  "components", "packageJson", "readme", "database", "deployments", "domains", "github", "plan",
+];
+
+/** Which facets each section's prompt actually needs. Trims prompt size/token
+ *  usage for sections that don't need the whole project scanned — e.g.
+ *  Database Docs never needs the component list, README never needs auth
+ *  file paths. ai_explain/viva_mode keep everything since they're explicitly
+ *  "explain the whole project." */
+const SECTION_FACETS: Record<DocSectionKey, Facet[]> = {
+  overview: ["framework", "fileTree", "routes", "components", "packageJson", "readme"],
+  project_report: ["framework", "fileTree", "routes", "apiRoutes", "components", "database", "deployments", "packageJson", "plan"],
+  technical: ["framework", "fileTree", "routes", "apiRoutes", "authFiles", "database", "components", "deployments", "envVars"],
+  developer_guide: ["framework", "fileTree", "envVars", "packageJson"],
+  user_manual: ["framework", "routes", "components"],
+  api_docs: ["framework", "apiRoutes"],
+  database_docs: ["database"],
+  architecture: ["framework", "fileTree", "routes", "apiRoutes", "database", "deployments", "components", "plan"],
+  testing: ["framework", "fileTree", "routes", "components"],
+  deployment_guide: ["deployments", "envVars", "domains"],
+  readme: ["framework", "packageJson", "routes", "deployments", "domains"],
+  release_notes: ["framework", "fileTree", "routes", "apiRoutes", "database", "deployments"],
+  ai_explain: ALL_FACETS,
+  viva_mode: ALL_FACETS,
+};
+
+function renderFacet(facet: Facet, a: ProjectAnalysis): string {
+  switch (facet) {
+    case "framework":
+      return `Detected framework/stack: ${a.framework}${a.stack ? ` (declared stack: ${a.stack})` : ""}\nMulti-page: ${a.is_multipage ? "yes" : "no"}`;
+    case "fileTree":
+      return `FILE TREE:\n${a.fileTree}`;
+    case "routes":
+      return `DETECTED PAGES/ROUTES:\n${a.routes}`;
+    case "apiRoutes":
+      return `DETECTED API ROUTES:\n${a.apiRoutes}`;
+    case "envVars":
+      return `DETECTED ENVIRONMENT VARIABLES (names only — never invent secret values):\n${a.envVars}`;
+    case "authFiles":
+      return `AUTHENTICATION-RELATED FILES:\n${a.authFiles}`;
+    case "components":
+      return `COMPONENTS:\n${a.components}`;
+    case "packageJson":
+      return `PACKAGE.JSON SUMMARY:\n${a.packageJsonSummary}`;
+    case "readme":
+      return `EXISTING README.md (for consistency — may be empty):\n${a.readmeExcerpt}`;
+    case "database": {
+      const db = a.database
+        ? `Provider: ${a.database.provider} · Mode: ${a.database.mode}${a.database.table_prefix ? ` · Table prefix: ${a.database.table_prefix}` : ""}\nTables: ${a.database.tables.length ? a.database.tables.join(", ") : "(provisioned, no tables yet)"}`
+        : "No database connected to this project.";
+      return `DATABASE:\n${db}`;
+    }
+    case "deployments": {
+      const deploy = a.deployments.length
+        ? a.deployments.map((d) => `- ${d.provider}: ${d.status}${d.deploy_url ? ` — ${d.deploy_url}` : ""}`).join("\n")
+        : "Not deployed yet.";
+      return `DEPLOYMENTS:\n${deploy}`;
+    }
+    case "domains":
+      return `Custom domains: ${a.domains.length ? a.domains.join(", ") : "(none)"}`;
+    case "github":
+      return `GitHub: ${a.githubConnected ? "connected" : "not connected"}`;
+    case "plan":
+      return a.plan
+        ? `PLANNER AGENT CONTEXT (original execution plan):\nType: ${(a.plan as any).project_type || "?"} · Complexity: ${(a.plan as any).complexity || "?"}\nUnderstanding: ${(a.plan as any).understanding || ""}\nDesign: ${(a.plan as any).design ? `${(a.plan as any).design.mode || ""} mode · ${(a.plan as any).design.style || ""}` : "?"}`
+        : "";
+  }
+}
+
+/** Composes a prompt-ready facts block from only the facets `key` needs. */
+export function buildFactsBlockForSection(analysis: ProjectAnalysis, key: DocSectionKey): string {
+  const facets = SECTION_FACETS[key] ?? ALL_FACETS;
+  const rendered = facets.map((f) => renderFacet(f, analysis)).filter((s) => s.trim().length > 0);
 
   return `=== REAL PROJECT FACTS (use these — never invent details that contradict or replace them) ===
-Project name: ${facts.title}
-Original request/prompt: ${facts.prompt}
-Detected framework/stack: ${framework}${facts.stack ? ` (declared stack: ${facts.stack})` : ""}
-Multi-page: ${facts.is_multipage ? "yes" : "no"}
+Project name: ${analysis.title}
+Original request/prompt: ${analysis.prompt}
 
-FILE TREE:
-${summarizeFiles(facts.files)}
-
-DETECTED PAGES/ROUTES:
-${extractRoutes(facts.files)}
-
-DETECTED API ROUTES:
-${extractApiRoutes(facts.files)}
-
-DETECTED ENVIRONMENT VARIABLES (names only — never invent secret values):
-${extractEnvVars(facts.files)}
-
-AUTHENTICATION-RELATED FILES:
-${extractAuth(facts.files)}
-
-COMPONENTS:
-${extractComponents(facts.files)}
-
-DATABASE:
-${db}
-
-DEPLOYMENTS:
-${deploy}
-Custom domains: ${facts.domains.length ? facts.domains.join(", ") : "(none)"}
-GitHub: ${facts.githubConnected ? "connected" : "not connected"}
-${facts.plan ? `\nPLANNER AGENT CONTEXT (original execution plan):\nType: ${(facts.plan as any).project_type || "?"} · Complexity: ${(facts.plan as any).complexity || "?"}\nUnderstanding: ${(facts.plan as any).understanding || ""}\nDesign: ${(facts.plan as any).design ? `${(facts.plan as any).design.mode || ""} mode · ${(facts.plan as any).design.style || ""}` : "?"}` : ""}
+${rendered.join("\n\n")}
 === END PROJECT FACTS ===`;
 }
 
@@ -198,7 +346,7 @@ ${facts.plan ? `\nPLANNER AGENT CONTEXT (original execution plan):\nType: ${(fac
 // document type needs to extract/explain from the facts above.
 // ---------------------------------------------------------------------------
 
-const SECTION_INSTRUCTIONS: Record<DocSectionKey, (facts: ProjectFacts) => string> = {
+const SECTION_INSTRUCTIONS: Record<DocSectionKey, (analysis: ProjectAnalysis) => string> = {
   overview: () => `Write the OVERVIEW document for this project. Cover, as markdown sections:
 # Project Name, ## Description, ## Objectives, ## Target Users, ## Features (bulleted, derived from actual pages/components — not generic), ## Technology Stack (from the detected framework/files), ## Dependencies (from package.json if present in the file tree), ## Project Structure (a short annotated tree from the real file list), ## Future Scope (a few grounded, plausible next steps given what exists today).`,
 
@@ -214,17 +362,17 @@ Where the real project doesn't yet contain something a formal report normally ne
 
   api_docs: () => `Write the API DOCUMENTATION by inspecting the DETECTED API ROUTES above. For EACH real API route found, document: endpoint path, HTTP method(s), required headers/authentication, request parameters/body shape (inferred from the route file's code), an example request, an example response, and applicable error/status codes. Structure as: ## Authentication (overall scheme, if any), then one ## subsection per endpoint, then ## Error Codes, ## Status Codes, ## Rate Limits (state "not implemented" if none is visible in the code rather than inventing limits). If there are NO detected API routes, say so plainly at the top and do not fabricate endpoints.`,
 
-  database_docs: (facts) => `Write the DATABASE DOCUMENTATION by inspecting the DATABASE facts above.${facts.database ? "" : " No database is connected to this project — say so clearly and describe how one would be added, rather than inventing a schema."} Cover: ## Tables, ## Columns, ## Relationships, ## Indexes, ## Foreign Keys, ## Policies (RLS), ## Triggers, ## Views, ## Functions, ## ER Explanation (a plain-language walkthrough of how the real tables relate). Only describe tables/columns that are actually listed in the facts — for anything not introspectable from the given data (e.g. exact column types), state that explicitly instead of guessing.`,
+  database_docs: (analysis) => `Write the DATABASE DOCUMENTATION by inspecting the DATABASE facts above.${analysis.database ? "" : " No database is connected to this project — say so clearly and describe how one would be added, rather than inventing a schema."} Cover: ## Tables, ## Columns, ## Relationships, ## Indexes, ## Foreign Keys, ## Policies (RLS), ## Triggers, ## Views, ## Functions, ## ER Explanation (a plain-language walkthrough of how the real tables relate). Only describe tables/columns that are actually listed in the facts — for anything not introspectable from the given data (e.g. exact column types), state that explicitly instead of guessing.`,
 
   architecture: () => `Write the ARCHITECTURE documentation. Cover: ## System Architecture (a high-level picture of client/server/DB), ## Frontend Architecture (real framework/component structure), ## Backend Architecture (real API routes / database layer, or "no backend beyond static rendering" if that's the truth), ## Authentication Architecture (real, or "none" if none detected), ## Deployment Architecture (real provider/status), ## Data Flow, ## Module Interaction (how the real components/pages depend on each other, inferred from imports where visible).`,
 
   testing: () => `Write the TESTING documentation. Cover: ## Testing Strategy, ## Unit Testing, ## Integration Testing, ## Manual Testing (a practical checklist derived from the real pages/features), ## Known Limitations, ## Edge Cases (grounded in the actual features present), ## Bug Reporting Process. If no test files are visible in the file tree, say so and recommend a concrete, minimal starting setup for this exact stack rather than a generic one.`,
 
-  deployment_guide: (facts) => `Write the DEPLOYMENT GUIDE. Cover, as separate ## sections: Vercel, Netlify, Docker, Self Hosting, Supabase, Environment Variables (the real detected names), Production Checklist. Reflect the REAL current deployment state (${facts.deployments.length ? facts.deployments.map((d) => `${d.provider}: ${d.status}`).join(", ") : "not deployed yet"}) instead of assuming a specific provider was already used unless the facts say so.`,
+  deployment_guide: (analysis) => `Write the DEPLOYMENT GUIDE. Cover, as separate ## sections: Vercel, Netlify, Docker, Self Hosting, Supabase, Environment Variables (the real detected names), Production Checklist. Reflect the REAL current deployment state (${analysis.deployments.length ? analysis.deployments.map((d) => `${d.provider}: ${d.status}`).join(", ") : "not deployed yet"}) instead of assuming a specific provider was already used unless the facts say so.`,
 
   readme: () => `Write a professional GitHub README.md. Cover: title + one-line description, ## Features (from real pages/components), ## Screenshots (use clearly marked placeholder image syntax like ![Screenshot](docs/screenshot-1.png) — do not invent real image URLs), ## Installation, ## Usage, ## Configuration (real env vars), ## Folder Structure, ## Contributing, ## License (state "Add your license here" if none is evident), ## Credits. Keep it concise, scannable, and idiomatic GitHub-flavored markdown (badges optional, real tech-stack badges only).`,
 
-  release_notes: (facts) => `Write RELEASE NOTES / a CHANGELOG entry for the CURRENT state of this project, framed as "What's in this version" rather than a fabricated multi-version history (unless the user's existing content already establishes prior versions — in that case add a new entry above them). Summarize real, concrete capabilities present in the file tree (pages, API routes, database, deployment) as bullet points grouped under ## Added / ## Changed / ## Fixed (omit empty groups) plus a ## Notes section for anything worth calling out (e.g. no database connected yet).`,
+  release_notes: (analysis) => `Write RELEASE NOTES / a CHANGELOG entry for the CURRENT state of this project, framed as "What's in this version" rather than a fabricated multi-version history (unless the user's existing content already establishes prior versions — in that case add a new entry above them). Summarize real, concrete capabilities present in the file tree (pages, API routes, database, deployment) as bullet points grouped under ## Added / ## Changed / ## Fixed (omit empty groups) plus a ## Notes section for anything worth calling out (e.g. no database connected yet).`,
 
   ai_explain: () => `(handled separately by buildAiExplainPrompt)`,
   viva_mode: () => `(handled separately by buildVivaModePrompt)`,
@@ -238,12 +386,16 @@ function buildRegenerationNote(req: SectionRequest): string {
   return `\n\nPREVIOUS VERSION (for context/continuity only — you may restructure freely if the project has changed):\n---\n${req.existingMarkdown}\n---`;
 }
 
-export function buildDocSectionPrompt(facts: ProjectFacts, req: SectionRequest): { system: string; user: string } {
-  if (req.key === "ai_explain") return buildAiExplainPrompt(facts, req);
-  if (req.key === "viva_mode") return buildVivaModePrompt(facts, req);
+/** Turns a (cached or freshly derived) analysis + a section request into a
+ *  ready-to-send { system, user } prompt pair. Pure function — never touches
+ *  the network or the database, so it's the same function whether the caller
+ *  hit the cache or not. */
+export function buildDocSectionPrompt(analysis: ProjectAnalysis, req: SectionRequest): { system: string; user: string } {
+  if (req.key === "ai_explain") return buildAiExplainPrompt(analysis, req);
+  if (req.key === "viva_mode") return buildVivaModePrompt(analysis, req);
 
-  const instructions = SECTION_INSTRUCTIONS[req.key](facts);
-  const factsBlock = buildFactsBlock(facts);
+  const instructions = SECTION_INSTRUCTIONS[req.key](analysis);
+  const factsBlock = buildFactsBlockForSection(analysis, req.key);
   const regen = buildRegenerationNote(req);
 
   const system = `You are the Documentation Agent of WebdevsAI, generating REAL, accurate project documentation — never placeholder or generic filler content when real information exists in the facts provided.
@@ -269,9 +421,9 @@ RULES:
   return { system, user: "Generate the document now." };
 }
 
-function buildAiExplainPrompt(facts: ProjectFacts, req: SectionRequest): { system: string; user: string } {
+function buildAiExplainPrompt(analysis: ProjectAnalysis, req: SectionRequest): { system: string; user: string } {
   const audience = req.audience === "viva" ? "viva" : "client";
-  const factsBlock = buildFactsBlock(facts);
+  const factsBlock = buildFactsBlockForSection(analysis, "ai_explain");
   const audienceInstructions = audience === "client"
     ? `Write for a CLIENT PRESENTATION: a non-technical stakeholder who paid for this project and wants confidence it works and was built well. Emphasize business value, what was delivered, and why choices were made in terms of outcomes (reliability, speed, cost, security) rather than implementation detail. Keep jargon minimal and always translate it when used.`
     : `Write for a COLLEGE VIVA (oral exam) defense: a student explaining their own project to examiners. Be precise and technical, use correct terminology, and be ready to justify each technology choice academically (why this was an appropriate choice for the stated objectives, what alternatives exist, and trade-offs).`;
@@ -295,9 +447,9 @@ No text outside the JSON object.`;
   return { system, user: "Explain the project now." };
 }
 
-function buildVivaModePrompt(facts: ProjectFacts, req: SectionRequest): { system: string; user: string } {
+function buildVivaModePrompt(analysis: ProjectAnalysis, req: SectionRequest): { system: string; user: string } {
   const levels = req.levels && req.levels.length ? req.levels : (["basic", "intermediate", "advanced"] as VivaLevel[]);
-  const factsBlock = buildFactsBlock(facts);
+  const factsBlock = buildFactsBlockForSection(analysis, "viva_mode");
 
   const system = `You are the Viva Mode assistant of WebdevsAI — you generate a realistic set of college viva (oral exam) interview questions AND expected model answers, based on the REAL project below, so a student can rehearse defending their own work.
 

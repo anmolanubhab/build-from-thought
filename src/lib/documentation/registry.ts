@@ -100,6 +100,12 @@ export const DOC_SECTIONS: DocSectionMeta[] = [
 
 export const DOC_SECTION_KEYS: DocSectionKey[] = DOC_SECTIONS.map((s) => s.key);
 
+/** The sections a "Generate All" run targets — excludes ai_explain/viva_mode,
+ *  which need a picked audience/level and stay as their own explicit actions.
+ *  Keep in sync with CORE_DOC_SECTION_KEYS in
+ *  supabase/functions/_shared/doc-sections.ts. */
+export const CORE_DOC_SECTION_KEYS: DocSectionKey[] = DOC_SECTIONS.filter((s) => s.group === "core").map((s) => s.key);
+
 export const DEFAULT_SECTION_KEY: DocSectionKey = "overview";
 
 export function getSectionMeta(key: DocSectionKey): DocSectionMeta {

@@ -169,54 +169,42 @@ export type Database = {
         }
         Relationships: []
       }
-      documentation_sections: {
+      documentation_generation_jobs: {
         Row: {
-          content_json: Json | null
-          content_md: string
-          created_at: string
-          generated_at: string | null
-          has_manual_edits: boolean
-          id: string
+          created_by: string | null
+          fingerprint: string | null
           project_id: string
-          section_key: string
-          source: string
-          source_fingerprint: string | null
-          title: string
+          section_keys: string[]
+          section_status: Json
+          started_at: string
+          status: string
           updated_at: string
         }
         Insert: {
-          content_json?: Json | null
-          content_md?: string
-          created_at?: string
-          generated_at?: string | null
-          has_manual_edits?: boolean
-          id?: string
+          created_by?: string | null
+          fingerprint?: string | null
           project_id: string
-          section_key: string
-          source?: string
-          source_fingerprint?: string | null
-          title?: string
+          section_keys?: string[]
+          section_status?: Json
+          started_at?: string
+          status?: string
           updated_at?: string
         }
         Update: {
-          content_json?: Json | null
-          content_md?: string
-          created_at?: string
-          generated_at?: string | null
-          has_manual_edits?: boolean
-          id?: string
+          created_by?: string | null
+          fingerprint?: string | null
           project_id?: string
-          section_key?: string
-          source?: string
-          source_fingerprint?: string | null
-          title?: string
+          section_keys?: string[]
+          section_status?: Json
+          started_at?: string
+          status?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "documentation_sections_project_id_fkey"
+            foreignKeyName: "documentation_generation_jobs_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -264,14 +252,67 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "documentation_section_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "documentation_section_versions_section_id_fkey"
             columns: ["section_id"]
             isOneToOne: false
             referencedRelation: "documentation_sections"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      documentation_sections: {
+        Row: {
+          content_json: Json | null
+          content_md: string
+          created_at: string
+          generated_at: string | null
+          has_manual_edits: boolean
+          id: string
+          project_id: string
+          section_key: string
+          source: string
+          source_fingerprint: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_json?: Json | null
+          content_md?: string
+          created_at?: string
+          generated_at?: string | null
+          has_manual_edits?: boolean
+          id?: string
+          project_id: string
+          section_key: string
+          source?: string
+          source_fingerprint?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content_json?: Json | null
+          content_md?: string
+          created_at?: string
+          generated_at?: string | null
+          has_manual_edits?: boolean
+          id?: string
+          project_id?: string
+          section_key?: string
+          source?: string
+          source_fingerprint?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "documentation_section_versions_project_id_fkey"
+            foreignKeyName: "documentation_sections_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -477,6 +518,35 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      project_analysis_cache: {
+        Row: {
+          analysis: Json
+          computed_at: string
+          fingerprint: string
+          project_id: string
+        }
+        Insert: {
+          analysis: Json
+          computed_at?: string
+          fingerprint: string
+          project_id: string
+        }
+        Update: {
+          analysis?: Json
+          computed_at?: string
+          fingerprint?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_analysis_cache_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_databases: {
         Row: {
