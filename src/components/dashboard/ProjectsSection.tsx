@@ -7,14 +7,17 @@ import { ArrowRight, Plus } from "lucide-react";
 interface ProjectsSectionProps {
   projects: Project[];
   loading: boolean;
-  onOpen: (p: Project) => void;
+  onOpen: (p: Project, opts?: { tab?: "preview" | "code"; device?: "desktop" | "tablet" | "mobile" }) => void;
   onDelete: (id: string) => void;
-  onStarChange?: (p: Project) => void;
+  /** Fires for star/pin/rename/publish toggles — any in-place field update on an existing project. */
+  onProjectUpdate?: (p: Project) => void;
+  /** Fires when Remix or Duplicate creates a brand-new project. */
+  onProjectCreated?: (p: Project) => void;
 }
 
 const tabs = ["My projects", "Recently viewed", "Starred", "Templates"];
 
-export default function ProjectsSection({ projects, loading, onOpen, onDelete, onStarChange }: ProjectsSectionProps) {
+export default function ProjectsSection({ projects, loading, onOpen, onDelete, onProjectUpdate, onProjectCreated }: ProjectsSectionProps) {
   const [activeTab, setActiveTab] = useState("My projects");
 
   const filteredProjects = activeTab === "Starred"
@@ -78,7 +81,8 @@ export default function ProjectsSection({ projects, loading, onOpen, onDelete, o
                 project={project}
                 onOpen={onOpen}
                 onDelete={onDelete}
-                onStarChange={onStarChange}
+                onProjectUpdate={onProjectUpdate}
+                onProjectCreated={onProjectCreated}
               />
             ))}
           </div>

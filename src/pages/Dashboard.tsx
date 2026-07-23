@@ -1,5 +1,6 @@
 // path: src/pages/Dashboard.tsx
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -21,12 +22,15 @@ import { toast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [genStage, setGenStage] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [modalInitialTab, setModalInitialTab] = useState<"preview" | "code">("preview");
+  const [modalInitialDevice, setModalInitialDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [ghConnected, setGhConnected] = useState(false);
@@ -201,6 +205,23 @@ const Dashboard = () => {
     setSelectedProject((sel) => (sel?.id === updated.id ? updated : sel));
   };
 
+  // ProjectActionMenu's "Preview Mobile" / "Export" open the same preview
+  // modal, just seeded to a different tab/device — everything else keeps
+  // going through the plain onOpen(project) card-click path (preview, desktop).
+  const handleOpenProject = (
+    project: Project,
+    opts?: { tab?: "preview" | "code"; device?: "desktop" | "tablet" | "mobile" },
+  ) => {
+    setModalInitialTab(opts?.tab ?? "preview");
+    setModalInitialDevice(opts?.device ?? "desktop");
+    setSelectedProject(project);
+  };
+
+  const handleProjectCreated = (created: Project) => {
+    setProjects((prev) => [created, ...prev]);
+    navigate(`/editor/${created.id}`);
+  };
+
   return (
     <div className="min-h-screen flex wb-sans" data-wb-theme={theme} style={{ background: "var(--wb-canvas)" }}>
       <Sidebar
@@ -251,11 +272,12 @@ const Dashboard = () => {
           <ProjectsSection
             projects={visibleProjects}
             loading={loadingProjects}
-            onOpen={setSelectedProject}
+            onOpen={handleOpenProject}
             onDelete={(id) => setDeleteTarget(id)}
-            onStarChange={(updated) =>
+            onProjectUpdate={(updated) =>
               setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
             }
+            onProjectCreated={handleProjectCreated}
           />
 
           <div className="h-8" />
@@ -267,6 +289,8 @@ const Dashboard = () => {
         onClose={() => setSelectedProject(null)}
         onUpdate={handleProjectUpdate}
         ghConnected={ghConnected}
+        initialTab={modalInitialTab}
+        initialDevice={modalInitialDevice}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

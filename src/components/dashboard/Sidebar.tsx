@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import { PremiumAnimatedCard } from "@/components/ui/PremiumAnimatedCard";
 import UpgradeDialog from "./UpgradeDialog";
 import CreateWorkspaceDialog from "./CreateWorkspaceDialog";
 import WorkspaceMembersDialog from "./WorkspaceMembersDialog";
@@ -371,33 +372,37 @@ export default function Sidebar({
 
         {/* Bottom Cards */}
         <div className="p-2 space-y-1.5 border-t" style={wbLine}>
-          <div
-            onClick={shareReferralLink}
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125"
-            style={wbSurface}
-          >
-            <div className="h-7 w-7 rounded-md flex items-center justify-center" style={{ background: "var(--wb-surface-raised)" }}>
-              <Users className="h-3.5 w-3.5" style={{ color: "var(--wb-circuit)" }} />
+          <PremiumAnimatedCard radiusClassName="rounded-lg" className="block w-full">
+            <div
+              onClick={shareReferralLink}
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125"
+              style={wbSurface}
+            >
+              <div className="h-7 w-7 rounded-md flex items-center justify-center" style={{ background: "var(--wb-surface-raised)" }}>
+                <Users className="h-3.5 w-3.5" style={{ color: "var(--wb-circuit)" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Share WebdevsAI</p>
+                <p className="wb-sans text-[10px]" style={{ color: "var(--wb-text-muted)" }}>5 credits per referral</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Share WebdevsAI</p>
-              <p className="wb-sans text-[10px]" style={{ color: "var(--wb-text-muted)" }}>5 credits per referral</p>
-            </div>
-          </div>
+          </PremiumAnimatedCard>
 
-          <div
-            onClick={() => setUpgradeOpen(true)}
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125"
-            style={wbSurface}
-          >
-            <div className="h-7 w-7 rounded-md flex items-center justify-center" style={{ background: "var(--wb-surface-raised)" }}>
-              <Zap className="h-3.5 w-3.5" style={{ color: "var(--wb-ember)" }} />
+          <PremiumAnimatedCard radiusClassName="rounded-lg" className="block w-full">
+            <div
+              onClick={() => setUpgradeOpen(true)}
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors cursor-pointer hover:brightness-125"
+              style={wbSurface}
+            >
+              <div className="h-7 w-7 rounded-md flex items-center justify-center" style={{ background: "var(--wb-surface-raised)" }}>
+                <Zap className="h-3.5 w-3.5" style={{ color: "var(--wb-ember)" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Upgrade to Pro</p>
+                <p className="wb-sans text-[10px]" style={{ color: "var(--wb-text-muted)" }}>Unlock more benefits</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold" style={{ color: "var(--wb-text)" }}>Upgrade to Pro</p>
-              <p className="wb-sans text-[10px]" style={{ color: "var(--wb-text-muted)" }}>Unlock more benefits</p>
-            </div>
-          </div>
+          </PremiumAnimatedCard>
 
           <div className="flex items-center justify-between px-2.5 py-1.5">
             <div className="flex items-center gap-2 min-w-0">

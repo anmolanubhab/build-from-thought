@@ -1,5 +1,5 @@
 // path: src/components/dashboard/ProjectModal.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Project, getProjectPages } from "@/lib/projects";
 import { downloadProject } from "@/services/export";
 import { deployProject, DeployStatus } from "@/services/deploy";
@@ -33,7 +33,7 @@ const typeLabels: Record<string, string> = {
   generic: "Web App",
 };
 
-type Device = "desktop" | "tablet" | "mobile";
+export type Device = "desktop" | "tablet" | "mobile";
 
 const devices: { id: Device; icon: typeof Monitor; width: string; label: string }[] = [
   { id: "desktop", icon: Monitor, width: "100%", label: "Desktop" },
@@ -46,11 +46,25 @@ interface Props {
   onClose: () => void;
   onUpdate?: (project: Project) => void;
   ghConnected?: boolean;
+  /** Tab to open on — e.g. ProjectActionMenu's "Export" opens straight to code. Defaults to "preview". */
+  initialTab?: "preview" | "code";
+  /** Device frame to open on — e.g. ProjectActionMenu's "Preview Mobile". Defaults to "desktop". */
+  initialDevice?: Device;
 }
 
-export default function ProjectModal({ project, onClose, onUpdate, ghConnected }: Props) {
-  const [tab, setTab] = useState<"preview" | "code">("preview");
-  const [device, setDevice] = useState<Device>("desktop");
+export default function ProjectModal({ project, onClose, onUpdate, ghConnected, initialTab, initialDevice }: Props) {
+  const [tab, setTab] = useState<"preview" | "code">(initialTab ?? "preview");
+  const [device, setDevice] = useState<Device>(initialDevice ?? "desktop");
+
+  // Re-seed the initial tab/device every time a (new) project opens, since
+  // this modal instance is reused across opens rather than remounted.
+  useEffect(() => {
+    if (project) {
+      setTab(initialTab ?? "preview");
+      setDevice(initialDevice ?? "desktop");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
   const [codeTab, setCodeTab] = useState<"html" | "react">("html");
   const [downloading, setDownloading] = useState(false);
   const [deployStatus, setDeployStatus] = useState<DeployStatus>("idle");

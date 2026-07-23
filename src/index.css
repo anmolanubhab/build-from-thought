@@ -233,4 +233,23 @@
   .animate-pulse-glow {
     animation: pulse-glow 4s ease-in-out infinite;
   }
+
+  /* ---- Premium animated card border (PremiumAnimatedCard.tsx) ----
+     Purple -> blue -> cyan conic gradient, rotated purely via `transform`
+     so the whole loop stays on the compositor thread (GPU accelerated,
+     no layout/paint work per frame). `prefers-reduced-motion` freezes it. */
+  @keyframes premium-border-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .animate-premium-border-spin {
+    animation: premium-border-spin 4s linear infinite;
+    will-change: transform;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-premium-border-spin {
+      animation: none;
+    }
+  }
 }

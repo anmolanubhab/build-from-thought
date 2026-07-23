@@ -1,10 +1,15 @@
 // path: src/components/dashboard/ProjectCard.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Project } from "@/lib/projects";
-import { toggleStar } from "@/services/db";
-import { Star, Trash2, Pencil } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Project, generateSlug } from "@/lib/projects";
+import { toggleStar, updateProject, remixProject, insertProject } from "@/services/db";
+import { resolveDefaultWorkspaceId } from "@/services/workspaces";
+import { downloadProject } from "@/services/export";
+import { isProjectPinned, toggleProjectPinned } from "@/lib/pinnedProjects";
+import { Pencil, MoreHorizontal } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ProjectActionMenu } from "./ProjectActionMenu";
 
 const typeLabels: Record<string, string> = {
   portfolio: "Portfolio",
@@ -15,9 +20,12 @@ const typeLabels: Record<string, string> = {
 
 interface Props {
   project: Project;
-  onOpen: (p: Project) => void;
+  onOpen: (p: Project, opts?: { tab?: "preview" | "code"; device?: "desktop" | "tablet" | "mobile" }) => void;
   onDelete?: (id: string) => void;
-  onStarChange?: (p: Project) => void;
+  /** Star/pin/rename/publish toggles — any in-place field update on this project. */
+  onProjectUpdate?: (p: Project) => void;
+  /** Remix or Duplicate creating a brand-new project. */
+  onProjectCreated?: (p: Project) => void;
 }
 
 function timeAgo(dateStr: string): string {
@@ -29,17 +37,25 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-export default function ProjectCard({ project, onOpen, onDelete, onStarChange }: Props) {
+export default function ProjectCard({ project, onOpen, onDelete, onProjectUpdate, onProjectCreated }: Props) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [starring, setStarring] = useState(false);
+  const [pinned, setPinned] = useState(() => isProjectPinned(project.id));
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(project.title);
+  const [busyAction, setBusyAction] = useState<"remix" | "duplicate" | null>(null);
 
-  const handleToggleStar = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  useEffect(() => {
+    if (!renaming) setRenameValue(project.title);
+  }, [project.title, renaming]);
+
+  const handleToggleStar = async () => {
     if (starring) return;
     setStarring(true);
     try {
       const updated = await toggleStar(project.id, !project.is_starred);
-      onStarChange?.(updated);
+      onProjectUpdate?.(updated);
     } catch (err) {
       toast({
         title: "Couldn't update star",
@@ -49,6 +65,147 @@ export default function ProjectCard({ project, onOpen, onDelete, onStarChange }:
     } finally {
       setStarring(false);
     }
+  };
+
+  const handleTogglePin = () => {
+    const next = toggleProjectPinned(project.id);
+    setPinned(next);
+    toast({ title: next ? "Pinned to top" : "Unpinned" });
+  };
+
+  const commitRename = async () => {
+    const trimmed = renameValue.trim();
+    setRenaming(false);
+    if (!trimmed || trimmed === project.title) {
+      setRenameValue(project.title);
+      return;
+    }
+    try {
+      const updated = await updateProject(project.id, { title: trimmed });
+      onProjectUpdate?.(updated);
+      toast({ title: "Project renamed" });
+    } catch (err) {
+      toast({
+        title: "Rename failed",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+      setRenameValue(project.title);
+    }
+  };
+
+  const handleRemix = async () => {
+    if (!user?.id || busyAction) return;
+    setBusyAction("remix");
+    try {
+      const created = await remixProject(project, user.id, generateSlug(project.title));
+      onProjectCreated?.(created);
+      toast({ title: "Remixed", description: `Created "${created.title}".` });
+    } catch (err) {
+      toast({
+        title: "Remix failed",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleDuplicate = async () => {
+    if (!user?.id || busyAction) return;
+    setBusyAction("duplicate");
+    try {
+      const workspaceId = await resolveDefaultWorkspaceId();
+      const created = await insertProject({
+        user_id: user.id,
+        workspace_id: workspaceId,
+        title: `${project.title} (Copy)`,
+        type: project.type,
+        prompt: project.prompt,
+        slug: generateSlug(project.title),
+        html: project.html,
+        css: project.css,
+        react_code: project.react_code,
+        is_multipage: project.is_multipage,
+        pages: project.pages,
+        files: project.files ?? null,
+        stack: project.stack ?? "static",
+        plan: project.plan ?? null,
+      });
+      onProjectCreated?.(created);
+      toast({ title: "Duplicated", description: `Created "${created.title}".` });
+    } catch (err) {
+      toast({
+        title: "Duplicate failed",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    try {
+      await downloadProject(project);
+    } catch (err) {
+      toast({
+        title: "Download failed",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const shareUrl = () => `${window.location.origin}/share/${project.slug}`;
+
+  const handleShare = async () => {
+    const url = shareUrl();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: project.title, url });
+        return;
+      } catch {
+        // User cancelled the native share sheet, or it's unsupported — fall through to clipboard.
+      }
+    }
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Share link copied!",
+      description: !project.is_public ? "This project is private — publish it so others can open the link." : undefined,
+    });
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareUrl());
+    toast({
+      title: "Link copied!",
+      description: !project.is_public ? "This project is private — publish it so others can open the link." : undefined,
+    });
+  };
+
+  const handleTogglePublish = async () => {
+    try {
+      const updated = await updateProject(project.id, { is_public: !project.is_public });
+      onProjectUpdate?.(updated);
+      toast({ title: updated.is_public ? "Project is now public" : "Project is now private" });
+    } catch (err) {
+      toast({
+        title: "Couldn't update",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenLivePreview = () => {
+    const url = project.deployed_url || (project.is_public ? shareUrl() : null);
+    if (!url) {
+      toast({ title: "No live preview yet", description: "Deploy or publish this project first." });
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -82,53 +239,105 @@ export default function ProjectCard({ project, onOpen, onDelete, onStarChange }:
           </span>
         </div>
 
-        {/* Actions on hover */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {pinned && (
+          <div className="absolute bottom-2 right-2">
+            <span
+              className="wb-mono px-2 py-0.5 text-[10px] uppercase tracking-wide border"
+              style={{ background: "rgba(14,17,22,0.85)", color: "var(--wb-ember)", borderColor: "var(--wb-line)" }}
+            >
+              Pinned
+            </span>
+          </div>
+        )}
+
+      </div>
+
+      {/* Spec-sheet info row — title/metadata on the left, actions always
+          visible on the right (not hover-only), matching the card footer. */}
+      <div className="p-3 border-t flex items-start justify-between gap-2" style={{ borderColor: "var(--wb-line)" }}>
+        <div className="min-w-0 flex-1">
+          {renaming ? (
+            <input
+              autoFocus
+              value={renameValue}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+                if (e.key === "Escape") { setRenameValue(project.title); setRenaming(false); }
+              }}
+              className="text-sm font-semibold mb-1.5 w-full bg-transparent border-b outline-none"
+              style={{ color: "var(--wb-text)", borderColor: "var(--wb-circuit)" }}
+            />
+          ) : (
+            <h3 className="text-sm font-semibold truncate mb-1.5" style={{ color: "var(--wb-text)" }}>
+              {project.title}
+              {busyAction && <span className="ml-1.5 text-xs font-normal" style={{ color: "var(--wb-text-muted)" }}>({busyAction === "remix" ? "remixing…" : "duplicating…"})</span>}
+            </h3>
+          )}
+          <div className="wb-mono flex items-center gap-2 text-[10px] uppercase tracking-wide" style={{ color: "var(--wb-text-muted)" }}>
+            <span>{timeAgo(project.created_at)}</span>
+            <span style={{ color: "var(--wb-line)" }}>·</span>
+            <span>{project.is_multipage ? "Multi-page" : "Single-page"}</span>
+            {project.is_public && (
+              <>
+                <span style={{ color: "var(--wb-line)" }}>·</span>
+                <span style={{ color: "var(--wb-circuit)" }}>Public</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Quick "Edit with AI" + the full action menu — always visible, no hover-fade */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); navigate(`/editor/${project.id}`); }}
-            className="p-1.5 rounded-md text-white transition-colors hover:opacity-90"
+            className="p-1.5 rounded-md text-white transition-all duration-150 hover:scale-110"
             style={{ background: "var(--wb-circuit)", color: "#0E1116" }}
             title="Edit with AI"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button
-            onClick={handleToggleStar}
-            disabled={starring}
-            className="p-1.5 rounded-md transition-colors"
-            style={{
-              background: project.is_starred ? "var(--wb-ember)" : "rgba(14,17,22,0.7)",
-              color: "white",
-            }}
-            title={project.is_starred ? "Unstar" : "Star"}
-          >
-            <Star className="h-3.5 w-3.5" fill={project.is_starred ? "white" : "none"} />
-          </button>
-          {onDelete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(project.id); }}
-              className="p-1.5 rounded-md text-white transition-colors hover:opacity-90"
-              style={{ background: "#E24B4A" }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Spec-sheet info row */}
-      <div className="p-3 border-t" style={{ borderColor: "var(--wb-line)" }}>
-        <h3 className="text-sm font-semibold truncate mb-1.5" style={{ color: "var(--wb-text)" }}>{project.title}</h3>
-        <div className="wb-mono flex items-center gap-2 text-[10px] uppercase tracking-wide" style={{ color: "var(--wb-text-muted)" }}>
-          <span>{timeAgo(project.created_at)}</span>
-          <span style={{ color: "var(--wb-line)" }}>·</span>
-          <span>{project.is_multipage ? "Multi-page" : "Single-page"}</span>
-          {project.is_public && (
-            <>
-              <span style={{ color: "var(--wb-line)" }}>·</span>
-              <span style={{ color: "var(--wb-circuit)" }}>Public</span>
-            </>
-          )}
+          <ProjectActionMenu
+            project={project}
+            isPinned={pinned}
+            trigger={
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="p-1.5 rounded-md text-white transition-all duration-150 hover:scale-110 data-[state=open]:scale-110"
+                style={{ background: "rgba(14,17,22,0.7)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(14,17,22,0.95)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(14,17,22,0.7)"; }}
+                aria-label="Project actions"
+                title="More actions"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            }
+            onOpen={() => navigate(`/editor/${project.id}`)}
+            onOpenLivePreview={handleOpenLivePreview}
+            onPreviewMobile={() => onOpen(project, { tab: "preview", device: "mobile" })}
+            onRename={() => setRenaming(true)}
+            onMoveToFolder={() => toast({ title: "Folders coming soon", description: "Project folders aren't built yet." })}
+            onToggleStar={handleToggleStar}
+            onTogglePin={handleTogglePin}
+            onRemix={handleRemix}
+            onDuplicate={handleDuplicate}
+            onExport={() => onOpen(project, { tab: "code" })}
+            onDownloadZip={handleDownloadZip}
+            onShare={handleShare}
+            onCopyLink={handleCopyLink}
+            onTogglePublish={handleTogglePublish}
+            onAnalytics={() => toast({ title: "Analytics coming soon", description: "Per-project analytics isn't built yet." })}
+            onActivity={() => {
+              toast({ title: "Opening workspace activity", description: "This shows activity for the whole workspace, not just this project." });
+              navigate("/dashboard/settings?section=audit-logs");
+            }}
+            onSettings={() => navigate(`/editor/${project.id}?tab=settings`)}
+            onDelete={() => onDelete?.(project.id)}
+          />
         </div>
       </div>
     </div>
