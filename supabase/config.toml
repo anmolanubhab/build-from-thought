@@ -15,3 +15,18 @@ verify_jwt = false
 
 [functions.github-push]
 verify_jwt = false
+
+[functions.mcp-connect]
+verify_jwt = true
+
+[functions.mcp-disconnect]
+verify_jwt = true
+
+[functions.mcp-refresh-tools]
+verify_jwt = true
+
+[functions.mcp-execute]
+verify_jwt = true
+
+[functions.mcp-chat]
+verify_jwt = true

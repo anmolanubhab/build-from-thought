@@ -22,7 +22,7 @@ import KnowledgeSection from "@/components/settings/KnowledgeSection";
 import SkillsSection from "@/components/settings/SkillsSection";
 import TemplatesSection from "@/components/settings/TemplatesSection";
 import DesignSystemsSection from "@/components/settings/DesignSystemsSection";
-import McpServerSection from "@/components/settings/McpServerSection";
+import McpIntegrationsSection from "@/components/settings/McpIntegrationsSection";
 import WorkspaceDomainsSection from "@/components/settings/WorkspaceDomainsSection";
 import PrivacySecuritySection from "@/components/settings/PrivacySecuritySection";
 import SecurityCenterSection from "@/components/settings/SecurityCenterSection";
@@ -89,7 +89,7 @@ const DashboardSettings = () => {
     ] },
     { group: "Build & deploy", items: [
       { id: "git", label: "Git", icon: GitBranch },
-      { id: "mcp", label: "MCP server", icon: Server },
+      { id: "mcp", label: "MCP Integrations", icon: Server },
       { id: "domains", label: "Workspace domains", icon: Globe },
     ] },
     { group: "Security", items: [
@@ -132,7 +132,7 @@ const DashboardSettings = () => {
     if (section === "git") return <GitSection />;
     if (section === "mcp") {
       if (!currentWorkspace) return null;
-      return <McpServerSection workspace={currentWorkspace} currentUserId={user?.id} />;
+      return <McpIntegrationsSection workspace={currentWorkspace} currentUserId={user?.id} />;
     }
     if (section === "domains") {
       if (!currentWorkspace) return null;
@@ -194,7 +194,7 @@ const DashboardSettings = () => {
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className={`mx-auto px-6 py-10 ${section === "people" || section === "plans" ? "max-w-5xl" : "max-w-2xl"}`}>
+        <div className={`mx-auto px-6 py-10 ${section === "people" || section === "plans" || section === "mcp" ? "max-w-5xl" : "max-w-2xl"}`}>
           <Link to="/dashboard" className="md:hidden inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6">
             <ArrowLeft className="h-3.5 w-3.5" /> Go back
           </Link>

@@ -368,6 +368,239 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_connections: {
+        Row: {
+          capabilities: Json
+          created_at: string
+          created_by: string
+          endpoint_url: string
+          id: string
+          last_error: string | null
+          last_sync_at: string | null
+          name: string
+          reuse_github_token: boolean
+          server_id: string | null
+          status: string
+          updated_at: string
+          vault_secret_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          capabilities?: Json
+          created_at?: string
+          created_by: string
+          endpoint_url: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          name: string
+          reuse_github_token?: boolean
+          server_id?: string | null
+          status?: string
+          updated_at?: string
+          vault_secret_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          capabilities?: Json
+          created_at?: string
+          created_by?: string
+          endpoint_url?: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          name?: string
+          reuse_github_token?: boolean
+          server_id?: string | null
+          status?: string
+          updated_at?: string
+          vault_secret_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_connections_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_logs: {
+        Row: {
+          connection_id: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          invoked_by: string | null
+          request_args: Json | null
+          status: string
+          tool_name: string
+          workspace_id: string
+        }
+        Insert: {
+          connection_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          invoked_by?: string | null
+          request_args?: Json | null
+          status: string
+          tool_name: string
+          workspace_id: string
+        }
+        Update: {
+          connection_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          invoked_by?: string | null
+          request_args?: Json | null
+          status?: string
+          tool_name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_logs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_permissions: {
+        Row: {
+          can_execute: boolean
+          connection_id: string
+          id: string
+          role: string
+          workspace_id: string
+        }
+        Insert: {
+          can_execute?: boolean
+          connection_id: string
+          id?: string
+          role: string
+          workspace_id: string
+        }
+        Update: {
+          can_execute?: boolean
+          connection_id?: string
+          id?: string
+          role?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_permissions_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_permissions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_servers: {
+        Row: {
+          auth_kind: string
+          created_at: string
+          description: string | null
+          doc_url: string | null
+          endpoint_url: string | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+        }
+        Insert: {
+          auth_kind: string
+          created_at?: string
+          description?: string | null
+          doc_url?: string | null
+          endpoint_url?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+        }
+        Update: {
+          auth_kind?: string
+          created_at?: string
+          description?: string | null
+          doc_url?: string | null
+          endpoint_url?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      mcp_tools: {
+        Row: {
+          connection_id: string
+          description: string | null
+          id: string
+          input_schema: Json
+          is_stale: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          connection_id: string
+          description?: string | null
+          id?: string
+          input_schema?: Json
+          is_stale?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          connection_id?: string
+          description?: string | null
+          id?: string
+          input_schema?: Json
+          is_stale?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_tools_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       netlify_connections: {
         Row: {
           access_token: string
